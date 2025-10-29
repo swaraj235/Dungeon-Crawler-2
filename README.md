@@ -61,6 +61,7 @@ cd Dungeon-Crawler
 --
 
 ## Folder Structure
+<br>
 DungeonCrawler2/
 ├── include/           # Header files
 │   ├── Entities/      # Player, Enemy, Character
