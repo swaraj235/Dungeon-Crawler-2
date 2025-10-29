@@ -42,7 +42,7 @@ The project demonstrates structured game development using **entities**, **syste
 
 ---
 
-## 🛠️ Dependancies
+## Dependancies
 
 - **C++17 or later**
 - **Raylib** installed
