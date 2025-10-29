@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dungeon Crawler - Game Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="container">
+    <header>
+        <h1>🎮 Dungeon Crawler Dashboard</h1>
+        <div class="header-actions">
+            <button class="btn-secondary" onclick="loadGameData()">🔄 Refresh Stats</button>
+            <button onclick="launchGame()">🎮 Launch Game</button>
+        </div>
+    </header>
+
+    <main>
+        <div class="grid">
+            <!-- Player Stats -->
+            <section class="card">
+                <h2>📊 Player Stats</h2>
+                <div class="stat-row">
+                    <span>Level</span>
+                    <span id="level" class="value">1</span>
+                </div>
+                <div class="stat-row">
+                    <span>Health</span>
+                    <span id="health" class="value">150/150</span>
+                </div>
+                <div class="progress-container">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="health-bar" style="width: 100%"></div>
+                    </div>
+                </div>
+                <div class="stat-row">
+                    <span>Experience</span>
+                    <span id="experience" class="value">0</span>
+                </div>
+                <div class="stat-row">
+                    <span>Weapon</span>
+                    <span id="weapon" class="value">Wooden Sword</span>
+                </div>
+            </section>
+
+            <!-- Game Progress -->
+            <section class="card">
+                <h2>🏰 Game Progress</h2>
+                <div class="stat-row">
+                    <span>Current Floor</span>
+                    <span id="floor" class="value">1</span>
+                </div>
+                <div class="stat-row">
+                    <span>Score</span>
+                    <span id="score" class="value">0</span>
+                </div>
+                <div class="stat-row">
+                    <span>Enemies Killed</span>
+                    <span id="enemies-killed" class="value">0</span>
+                </div>
+                <div class="stat-row">
+                    <span>Play Time</span>
+                    <span id="playtime" class="value">0s</span>
+                </div>
+            </section>
+
+            <!-- Inventory -->
+            <section class="card">
+                <h2>🎒 Inventory</h2>
+                <div class="stat-row">
+                    <span>💚 Health Potions</span>
+                    <span id="health-potions" class="value">0</span>
+                </div>
+                <div class="stat-row">
+                    <span>⚡ Speed Potions</span>
+                    <span id="speed-potions" class="value">0</span>
+                </div>
+                <div class="stat-row">
+                    <span>👻 Stealth Potions</span>
+                    <span id="stealth-potions" class="value">0</span>
+                </div>
+                <div class="stat-row">
+                    <span>🔥 Rage Potions</span>
+                    <span id="rage-potions" class="value">0</span>
+                </div>
+            </section>
+
+            <!-- Statistics -->
+            <section class="card">
+                <h2>📈 Statistics</h2>
+                <div class="stat-row">
+                    <span>Total Damage Dealt</span>
+                    <span id="damage-dealt" class="value">0</span>
+                </div>
+                <div class="stat-row">
+                    <span>Total Damage Taken</span>
+                    <span id="damage-taken" class="value">0</span>
+                </div>
+                <div class="stat-row">
+                    <span>Potions Used</span>
+                    <span id="potions-used" class="value">0</span>
+                </div>
+                <div class="stat-row">
+                    <span>Highest Floor</span>
+                    <span id="highest-floor" class="value">1</span>
+                </div>
+            </section>
+
+            <!-- Last Save -->
+            <section class="card">
+                <h2>💾 Save Information</h2>
+                <div class="stat-row">
+                    <span>Last Save</span>
+                    <span id="last-save" class="value">Never</span>
+                </div>
+                <div style="margin-top: 20px;">
+                    <button onclick="openGameFolder()" style="width: 100%">📂 Open Save Folder</button>
+                </div>
+            </section>
+
+            <!-- Achievements -->
+            <section class="card">
+                <h2>🏆 Achievements</h2>
+                <div id="achievements-list">
+                    <div class="achievement" title="Start playing to unlock!">🎯</div>
+                    <div class="achievement" title="Start playing to unlock!">⭐</div>
+                    <div class="achievement" title="Start playing to unlock!">👑</div>
+                    <div class="achievement" title="Start playing to unlock!">💰</div>
+                    <div class="achievement" title="Start playing to unlock!">⚔️</div>
+                    <div class="achievement" title="Start playing to unlock!">🏰</div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <footer>
+        <p>Dungeon Crawler v2.0 | Last Updated: <span id="update-time">Never</span></p>
+    </footer>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>

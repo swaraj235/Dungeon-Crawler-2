@@ -1,0 +1,24 @@
+# Build folders
+/build/
+bin/
+obj/
+out/
+CMakeFiles/
+CMakeCache.txt
+
+# IDE configs
+.idea/
+.vscode/
+*.user
+*.sln
+*.vcxproj*
+cmake-build-*/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Logs and temporary files
+*.log
+*.tmp
+*.bak
