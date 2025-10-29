@@ -62,8 +62,8 @@ cd Dungeon-Crawler
 
 ## Folder Structure
 <br>
-DungeonCrawler2/
-├── include/           # Header files
+DungeonCrawler2/<br>
+├── include/<br>           # Header files
 │   ├── Entities/      # Player, Enemy, Character
 │   ├── Systems/       # EffectSystem, PotionSystem, etc.
 │   └── ...
