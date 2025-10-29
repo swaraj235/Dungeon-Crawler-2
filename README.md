@@ -51,9 +51,9 @@ The project demonstrates structured game development using **entities**, **syste
 
 --
 
-## 🚀 How to Build & Run
+## How to Build & Run
 
-### 1️⃣ Clone the Repository
+### Clone the Repository
 ```bash
 git clone https://github.com/swaraj235/Dungeon-Crawler.git
 cd Dungeon-Crawler
