@@ -63,14 +63,14 @@ cd Dungeon-Crawler
 ## Folder Structure
 <br>
 DungeonCrawler2/<br>
-├── include/<br>           # Header files
-│   ├── Entities/      # Player, Enemy, Character
-│   ├── Systems/       # EffectSystem, PotionSystem, etc.
-│   └── ...
-├── src/               # Source code (.cpp files)
-├── assets/            # Sprites, textures, sounds
-├── CMakeLists.txt     # Build configuration
-└── main.cpp           # Game entry point
+├── include/           # Header files<br>
+│   ├── Entities/      # Player, Enemy, Character<br>
+│   ├── Systems/       # EffectSystem, PotionSystem, etc.<br>
+│   └── ...<br>
+├── src/               # Source code (.cpp files)<br>
+├── assets/            # Sprites, textures, sounds<br>
+├── CMakeLists.txt     # Build configuration<br>
+└── main.cpp           # Game entry point<br>
 
 
 
