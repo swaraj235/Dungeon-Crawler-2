@@ -4,7 +4,7 @@ std::vector<WeaponStats> WeaponSystem::weapons;
 
 void WeaponSystem::initialize() {
     weapons = {
-        {"Wooden Sword", 10, 1.0f, 0.0f, "Basic starter weapon", 1},
+        {"Valyrian Sword", 10, 1.0f, 0.0f, "Basic starter weapon", 1},
         {"Iron Katana", 18, 1.2f, 0.05f, "Fast and sharp", 5},
         {"Steel Dagger", 12, 1.5f, 0.10f, "Fastest weapon with crit bonus", 10},
         {"Shuriken", 15, 0.8f, 0.0f, "Ranged throwing weapon", 15},

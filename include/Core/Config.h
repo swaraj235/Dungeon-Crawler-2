@@ -21,7 +21,7 @@ namespace Config {
     constexpr int DAMAGE_PER_LEVEL = 6;
     constexpr float SPEED_PER_LEVEL = 3.0f;
     constexpr int EXP_FOR_LEVEL_2 = 100;
-    constexpr float EXP_SCALING = 1.5f; // Each level needs 1.5x more exp
+    constexpr float EXP_SCALING = 1.0f; // Each level needs 1.5x more exp
 
     // Combat
     constexpr float ATTACK_RANGE = 80.0f;
@@ -39,12 +39,12 @@ namespace Config {
     constexpr int LEVELS_PER_FLOOR = 5; // New map every 5 levels
 
     // Potion Effects
-    constexpr int HEALTH_POTION_HEAL = 50;
+    constexpr int HEALTH_POTION_HEAL = 75;
     constexpr int HOLY_WATER_OF_LIFE_HEAL = 500;
-    constexpr float SPEED_POTION_DURATION = 800.0f;
+    constexpr float SPEED_POTION_DURATION = 8000.0f;
     constexpr float SPEED_POTION_MULTIPLIER = 1.5f;
-    constexpr float STEALTH_POTION_DURATION = 600.0f;
-    constexpr float RAGE_POTION_DURATION = 10.0f;
+    constexpr float STEALTH_POTION_DURATION = 6000.0f;
+    constexpr float RAGE_POTION_DURATION = 1000.0f;
     constexpr float RAGE_POTION_MULTIPLIER = 1.3f;
 
     // Drop Rates (0.0 to 1.0)

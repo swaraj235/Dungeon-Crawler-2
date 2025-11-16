@@ -144,16 +144,12 @@ void Game::update(float deltaTime) {
     gameTime += deltaTime;
     enemySpawnTimer += deltaTime;
 
-    // If inventory open, DON'T update game world BUT still allow input handling
-    // This was wrong - we were returning completely!
-    // So let me fix this properly:
-
     if (attackFlashTimer > 0) attackFlashTimer -= deltaTime;
     if (cameraShakeTime > 0) cameraShakeTime -= deltaTime;
 
     // ONLY skip player/enemy updates when inventory is open
     if (inventoryOpen) {
-        return;  // This is correct - don't update gameplay
+        return;
     }
 
     updatePlayer(deltaTime);
@@ -511,16 +507,31 @@ EnemyType Game::selectEnemyType(int playerLevel) {
     std::vector<EnemyType> availableTypes;
 
     // Tier D (Always available)
+    if (playerLevel >= 1)
     availableTypes.insert(availableTypes.end(), {
         EnemyType::GOBLIN, EnemyType::SKELETON, EnemyType::SLIME,
-        EnemyType::HOUND, EnemyType::BAT
     });
+
+    if (playerLevel >= 5)
+        availableTypes.insert(availableTypes.end(), {
+            EnemyType::BAT, EnemyType::FIRE_SPIRIT, EnemyType::DARK_SPIRIT, EnemyType::LIGHT_SPIRIT
+        });
+
+    if (playerLevel >= 8)
+        availableTypes.insert(availableTypes.end(), {
+            EnemyType::HOUND, EnemyType::SALAMANDER_MAN
+        });
 
     // Tier C (Level 10+)
     if (playerLevel >= 10) {
         availableTypes.insert(availableTypes.end(), {
-            EnemyType::CHIMERA_ANT, EnemyType::WEREWOLF, EnemyType::CERBERUS,
-            EnemyType::GIANT_CENTIPEDE, EnemyType::GIANT_SNAKE, EnemyType::STONE_TROLL
+            EnemyType::CHIMERA_ANT, EnemyType::WEREWOLF, EnemyType::CERBERUS, EnemyType::HONEY_BEE
+        });
+    }
+
+    if (playerLevel >= 12) {
+        availableTypes.insert(availableTypes.end(), {
+            EnemyType::CYCLOPS, EnemyType::MINOTAUR, EnemyType::STONE_GOLEM, EnemyType::ANCIENT_MUMMY
         });
     }
 
@@ -528,6 +539,29 @@ EnemyType Game::selectEnemyType(int playerLevel) {
         std::uniform_int_distribution<int> bossChance(1, 100);
         if (bossChance(rng) <= 5) { // 5% chance for Shadow Paladin
             return EnemyType::FALLEN_SHADOW_PALADIN;
+        }
+        availableTypes.insert(availableTypes.end(), {
+            EnemyType::IMP, EnemyType::ELF_GIRL, EnemyType::SKELETON_KNIGHT, EnemyType::WITCH
+        });
+    }
+
+    if (playerLevel >= 18) {
+        availableTypes.insert(availableTypes.end(), {
+            EnemyType::MAGE, EnemyType::GOBLIN_GIANT, EnemyType::LAVA_GOLEM
+        });
+    }
+
+    if (playerLevel >= 20) {
+        std::uniform_int_distribution<int> bossChance(1, 100);
+        if (bossChance(rng) <= 5) { // 5% chance for Shadow Paladin
+            return EnemyType::HARPY_QUEEN;
+        }
+    }
+
+    if (playerLevel >= 25) {
+        std::uniform_int_distribution<int> bossChance(1, 100);
+        if (bossChance(rng) <= 5) {
+            return EnemyType::NECROMANCER;
         }
     }
 
@@ -698,7 +732,7 @@ void Game::generateItemDrops(Enemy* enemy) {
     player->addItem("Essence Stone", stoneCount);
 
     // Special drops based on enemy type
-    if (enemy->getEnemyType() == EnemyType::GIANT_SNAKE && enemiesKilled % 10 == 0) {
+    if (enemy->getEnemyType() == EnemyType::MINOTAUR && enemiesKilled % 10 == 0) {
         player->addItem("Venom Sword", 1);
         particleSystem.addMagic(enemy->getPosition(), Color{0, 200, 0, 255}, 15);
     }

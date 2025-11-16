@@ -5,15 +5,15 @@
 
 enum class EnemyType {
     // Tier D
-    GOBLIN, SKELETON, SLIME, HOUND, BAT,
+    GOBLIN, SKELETON, SLIME, HOUND, BAT, FIRE_SPIRIT, DARK_SPIRIT, LIGHT_SPIRIT,
     // Tier C
-    CHIMERA_ANT, WEREWOLF, CERBERUS, GIANT_CENTIPEDE, GIANT_SNAKE, STONE_TROLL,
+    CHIMERA_ANT, WEREWOLF, CERBERUS, CYCLOPS, MINOTAUR, STONE_GOLEM, SALAMANDER_MAN,HONEY_BEE, SKELETON_HOUND,
     //Tier B
-    SKELETON_GIANT, ICE_ELF, GOBLIN_GIANT, MAGE, LAVA_GOLEM,
+    SKELETON_KNIGHT, ELF_GIRL, GOBLIN_GIANT, MAGE, LAVA_GOLEM, IMP, ANCIENT_MUMMY,
     // Tier A
-    RED_ORC, BAT_WITCH, FALLEN_SHADOW_PALADIN, HARPY_QUEEN, NECROMANCER_GENERAL,
+    RED_ORC, WITCH, FALLEN_SHADOW_PALADIN, HARPY_QUEEN,
     //Tier S
-    DRAGON, TITAN, SKELETON_KING, GOBLIN_MAMA, FROST_KING, ABYSSAL_HYDRA
+    DRAGON, TITAN, SKELETON_KING, GOBLIN_MAMA, FROST_KING, ABYSSAL_HYDRA, NECROMANCER,
 };
 
 enum class EnemyTier { D, C, B, A, S };
@@ -89,12 +89,12 @@ public:
     void updateAI(float deltaTime) override;
 };
 
-class Hound : public Enemy {
+class FireHound : public Enemy {
 private:
     float dashCooldown;
     float lastDashTime;
 public:
-    Hound(int playerLevel);
+    FireHound(int playerLevel);
     void updateAI(float deltaTime) override;
     void dash();
 };
@@ -104,6 +104,24 @@ private:
     float flightHeight;
 public:
     Bat(int playerLevel);
+    void updateAI(float deltaTime) override;
+};
+
+class Fire_Spirit : public Enemy {
+public:
+    Fire_Spirit(int playerLevel);
+    void updateAI(float deltaTime) override;
+};
+
+class Dark_Spirit : public Enemy {
+public:
+    Dark_Spirit(int playerLevel);
+    void updateAI(float deltaTime) override;
+};
+
+class Light_Spirit : public Enemy {
+public:
+    Light_Spirit(int playerLevel);
     void updateAI(float deltaTime) override;
 };
 
@@ -131,27 +149,102 @@ public:
     void performAttack() override;
 };
 
-class GiantCentipede : public Enemy {
+class Cyclops : public Enemy {
 public:
-    GiantCentipede(int playerLevel);
+    Cyclops(int playerLevel);
     void updateAI(float deltaTime) override;
 };
 
-class GiantSnake : public Enemy {
+class Minotaur : public Enemy {
 private:
     float coilCooldown;
 public:
-    GiantSnake(int playerLevel);
+    Minotaur(int playerLevel);
     void updateAI(float deltaTime) override;
 };
 
-class StoneTroll : public Enemy {
+class Stone_Golem : public Enemy {
 private:
     float regenerateCooldown;
 public:
-    StoneTroll(int playerLevel);
+    Stone_Golem(int playerLevel);
     void updateAI(float deltaTime) override;
     void regenerate();
+};
+
+class SalamanderMan : public Enemy {
+public:
+    SalamanderMan(int playerLevel);
+    void updateAI(float deltaTime) override;
+};
+
+class HoneyBee : public Enemy {
+public:
+    HoneyBee(int playerLevel);
+    void updateAI(float deltaTime) override;
+};
+
+class SkeletonHound : public Enemy {
+public:
+    SkeletonHound(int playerLevel);
+    void updateAI(float deltaTime) override;
+};
+
+// Tier B Enemies
+class Skeleton_Knight : public Enemy {
+public:
+    Skeleton_Knight(int playerLevel);
+    void updateAI(float deltaTime) override;
+    void performAttack() override;
+};
+
+class Elf_Girl : public Enemy {
+public:
+    Elf_Girl(int playerLevel);
+    void updateAI(float deltaTime) override;
+    void performAttack() override;
+};
+
+class Goblin_Giant : public Enemy {
+public:
+    Goblin_Giant(int playerLevel);
+    void updateAI(float deltaTime) override;
+    void performAttack() override;
+};
+
+class Mage : public Enemy {
+public:
+    Mage(int playerLevel);
+    void updateAI(float deltaTime) override;
+    void performAttack() override;
+};
+
+class Lava_Golem : public Enemy {
+private:
+    float regenerateCooldown;
+
+public:
+    Lava_Golem(int playerLevel);
+    void updateAI(float deltaTime) override;
+    void regenerate();
+    // void performAttack() override; // optional but consistent
+};
+
+class Imp : public Enemy {
+private:
+    float teleportCooldown;
+    float lastTeleportTime;
+
+public:
+    Imp(int playerLevel);
+    void updateAI(float deltaTime) override;
+    void performAttack() override;
+};
+
+class AncientMummy : public Enemy {
+public:
+    AncientMummy(int playerLevel);
+    void updateAI(float deltaTime) override;
 };
 
 // Tier A Enemies
@@ -167,6 +260,31 @@ public:
     void performAttack() override;
 };
 
-class HarpyQueen : public Enemy{};
+class HarpyQueen : public Enemy {
+private:
+    float swoopCooldown;
+    float lastSwoopTime;
 
-class Necromancer : public Enemy{};
+public:
+    HarpyQueen(int playerLevel);
+    void updateAI(float deltaTime) override;
+    void performAttack() override;
+};
+
+class Witch : public Enemy {
+public:
+    Witch(int playerLevel);
+    void updateAI(float deltaTime) override;
+};
+
+// Tier S
+
+class Necromancer : public Enemy {
+public:
+    Necromancer(int playerLevel);
+    void updateAI(float deltaTime) override;
+    void performAttack() override;
+};
+
+
+

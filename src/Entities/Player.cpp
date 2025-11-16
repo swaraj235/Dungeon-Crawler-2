@@ -5,7 +5,7 @@
 #include <algorithm>
 
 Player::Player()
-    : Character(Config::PLAYER_BASE_HEALTH, 1, "assets/sprites/player.png", "Hero"),
+    : Character(Config::PLAYER_BASE_HEALTH, 1, "assets/sprite/player_small.png", "Hero"),
       speed(Config::PLAYER_BASE_SPEED), attackDamage(Config::PLAYER_BASE_DAMAGE),
       attackCooldown(Config::PLAYER_ATTACK_COOLDOWN), lastAttackTime(0),
       critChance(Config::PLAYER_CRIT_CHANCE), critMultiplier(Config::PLAYER_CRIT_MULTIPLIER),

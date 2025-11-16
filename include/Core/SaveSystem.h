@@ -27,7 +27,7 @@ struct SaveData {
     float playTime; // In seconds
 
     // Equipment
-    std::string currentWeapon = "Wooden Sword";
+    std::string currentWeapon = "Valyrion Sword";
 
     // Inventory
     PotionInventory potions;

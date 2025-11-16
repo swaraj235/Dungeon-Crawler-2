@@ -13,6 +13,7 @@ SoundManager::~SoundManager() {
 void SoundManager::initialize() {
     // Load sound effects (placeholder - actual files needed)
     try {
+        sounds["dungeon_theme"] = LoadSound("dungeon_theme.wav");
         sounds["attack_sword"] = LoadSound("assets/sounds/sfx/attack.wav");
         sounds["hit"] = LoadSound("assets/sounds/sfx/hit.wav");
         sounds["pickup"] = LoadSound("assets/sounds/sfx/pickup.wav");

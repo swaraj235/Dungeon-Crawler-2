@@ -216,8 +216,8 @@ void MainMenu::drawMainMenu() {
     }
 
     // Instructions
-    DrawText("Use UP/DOWN arrow keys to navigate", (screenWidth - 350) / 2, screenHeight - 80, 14, GRAY);
-    DrawText("Press ENTER to select", (screenWidth - 250) / 2, screenHeight - 50, 14, GRAY);
+    DrawText("Use UP/DOWN arrow keys to navigate", (screenWidth - subtitleWidth) / 2, screenHeight - 80, 14, GRAY);
+    DrawText("Press ENTER to select", (screenWidth - subtitleWidth) / 2, screenHeight - 50, 14, GRAY);
 }
 
 void MainMenu::drawNewGame() {

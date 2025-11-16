@@ -11,13 +11,12 @@ void ParticleSystem::addExplosion(Vector2 position, Color color, int count) {
     std::uniform_real_distribution<float> speedDist(50, 150);
     std::uniform_real_distribution<float> lifeDist(0.5f, 1.5f);
 
-    for (int i = 0; i < count; i++) {
+    for (int i {0}; i < count; i++) {
         float angle = angleDist(gen);
         float speed = speedDist(gen);
         Vector2 velocity = {cos(angle) * speed, sin(angle) * speed};
         float life = lifeDist(gen);
         float size = 3.0f + (rand() % 3);
-
         particles.emplace_back(position, velocity, color, life, size);
     }
 }

@@ -14,7 +14,6 @@
 #include <memory>
 #include <random>
 
-
 struct DamageNumber {
     Vector2 position;
     int damage;
