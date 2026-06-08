@@ -10,7 +10,7 @@ Player::Player()
       attackCooldown(Config::PLAYER_ATTACK_COOLDOWN), lastAttackTime(0),
       critChance(Config::PLAYER_CRIT_CHANCE), critMultiplier(Config::PLAYER_CRIT_MULTIPLIER),
       speedMultiplier(1.0f), maxInventorySize(24), speedBuffTime(0), stealthBuffTime(0),
-      rageBuffTime(0), isStealthed(false) {
+      rageBuffTime(0), isStealthed(false), facingRight(false) {
 
     position = {Config::SCREEN_WIDTH / 2.0f, Config::SCREEN_HEIGHT / 2.0f};
     updateAttackRange();
@@ -38,6 +38,10 @@ void Player::update(float deltaTime) {
     if (stealthBuffTime > 0) stealthBuffTime -= deltaTime;
     if (rageBuffTime > 0) rageBuffTime -= deltaTime;
 
+    speedMultiplier = 1.0f;
+    if (speedBuffTime > 0) speedMultiplier *= 1.5f; // Assume speed buff gives 50%
+    if (hasItem("Boots of Swiftness")) speedMultiplier *= 1.2f;
+
     // Update stealth status
     isStealthed = (stealthBuffTime > 0);
 
@@ -53,7 +57,14 @@ void Player::draw() {
     if (rageBuffTime > 0) playerColor = RED;
 
     if (sprite.id != 0) {
-        DrawTexture(sprite, (int)position.x, (int)position.y, playerColor);
+        // Flip sprite horizontally when facing right
+        Rectangle src = {
+            facingRight ? (float)sprite.width : 0.0f,
+            0.0f,
+            facingRight ? -(float)sprite.width : (float)sprite.width,
+            (float)sprite.height
+        };
+        DrawTextureRec(sprite, src, position, playerColor);
     } else {
         DrawRectangle((int)position.x, (int)position.y, 32, 32, BLUE);
     }
@@ -75,8 +86,8 @@ void Player::handleInput() {
 
     if (IsKeyDown(KEY_W) || IsKeyDown(KEY_UP)) movement.y -= speed;
     if (IsKeyDown(KEY_S) || IsKeyDown(KEY_DOWN)) movement.y += speed;
-    if (IsKeyDown(KEY_A) || IsKeyDown(KEY_LEFT)) movement.x -= speed;
-    if (IsKeyDown(KEY_D) || IsKeyDown(KEY_RIGHT)) movement.x += speed;
+    if (IsKeyDown(KEY_A) || IsKeyDown(KEY_LEFT)) { movement.x -= speed; facingRight = false; }
+    if (IsKeyDown(KEY_D) || IsKeyDown(KEY_RIGHT)) { movement.x += speed; facingRight = true; }
 
     position.x += movement.x * GetFrameTime() * speedMultiplier;
     position.y += movement.y * GetFrameTime() * speedMultiplier;
@@ -94,6 +105,11 @@ int Player::computeAttackDamage() const {
     // Apply rage buff
     if (rageBuffTime > 0) {
         baseDamage = (int)(baseDamage * Config::RAGE_POTION_MULTIPLIER);
+    }
+
+    // Passive effects from items
+    if (hasItem("Ring of Fire")) {
+        baseDamage = (int)(baseDamage * 1.15f);
     }
 
     return baseDamage;
@@ -134,10 +150,14 @@ bool Player::canCast(SpellType type) const {
     return false;
 }
 
+int Player::getExpNeeded() const {
+    return (int)(Config::EXP_FOR_LEVEL_2 * pow(Config::EXP_SCALING, level - 1));
+}
+
 void Player::gainExperience(int amount) {
     experience += amount;
 
-    int expNeeded = (int)(Config::EXP_FOR_LEVEL_2 * pow(Config::EXP_SCALING, level - 1));
+    int expNeeded = getExpNeeded();
 
     if (experience >= expNeeded) {
         level++;
@@ -198,6 +218,10 @@ bool Player::useItem(const std::string& itemName) {
                 applyRageBuff(Config::RAGE_POTION_DURATION);
             } else if (itemName == "Holy Water of Life") {
                 heal(Config::HOLY_WATER_OF_LIFE_HEAL);
+            } else if (itemName == "Seeds of Evolution") {
+                gainExperience(50);
+            } else if (itemName == "Scorching Gauntlet") {
+                currentWeapon = {WeaponType::IRON_KATANA, 25, 1.2f, 0.15f, "Scorching Gauntlet"};
             }
 
             if (item.quantity <= 0) {

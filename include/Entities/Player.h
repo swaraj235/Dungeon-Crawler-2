@@ -73,6 +73,9 @@ private:
     float rageBuffTime;
     bool isStealthed;
 
+    // Direction
+    bool facingRight;
+
 public:
     Player();
     ~Player();
@@ -125,6 +128,10 @@ public:
     bool getIsStealthed() const { return isStealthed; }
     float getSpeedBuffTime() const { return speedBuffTime; }
     float getRageBuffTime() const { return rageBuffTime; }
+    int getLevel() const { return level; }
+    int getExperience() const { return experience; }
+    int getExpNeeded() const;
+    int getHealth() const { return health; }
     int getAttackDamage() const { return attackDamage; }
     float getCritChance() const { return critChance; }
     float getCritMultiplier() const { return critMultiplier; }

@@ -41,10 +41,10 @@ namespace Config {
     // Potion Effects
     constexpr int HEALTH_POTION_HEAL = 75;
     constexpr int HOLY_WATER_OF_LIFE_HEAL = 500;
-    constexpr float SPEED_POTION_DURATION = 8000.0f;
+    constexpr float SPEED_POTION_DURATION = 15.0f;
     constexpr float SPEED_POTION_MULTIPLIER = 1.5f;
-    constexpr float STEALTH_POTION_DURATION = 6000.0f;
-    constexpr float RAGE_POTION_DURATION = 1000.0f;
+    constexpr float STEALTH_POTION_DURATION = 15.0f;
+    constexpr float RAGE_POTION_DURATION = 12.0f;
     constexpr float RAGE_POTION_MULTIPLIER = 1.3f;
 
     // Drop Rates (0.0 to 1.0)

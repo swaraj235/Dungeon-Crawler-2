@@ -131,34 +131,51 @@ void MapGenerator::draw() {
         for (int x = 0; x < mapWidth; x++) {
             Tile& tile = tiles[y][x];
 
-            Color color;
-            if (tile.type == TileType::FLOOR) {
-                // Subtle checkerboard for floor depth
-                if ((x + y) % 2 == 0)
-                    color = Color{78, 74, 68, 255};
-                else
-                    color = Color{72, 68, 62, 255};
-            } else if (tile.type == TileType::DOOR) {
-                color = Color{180, 120, 40, 255};
-            } else if (tile.type == TileType::TRAP) {
-                color = Color{140, 30, 30, 255};
-            } else {
-                // Wall — darker to contrast with floor
-                color = Color{28, 26, 32, 255};
-            }
+            // 1. Draw Floor, Door, or Trap
+            if (tile.type == TileType::FLOOR || tile.type == TileType::DOOR || tile.type == TileType::TRAP) {
+                // Base floor color
+                Color color = Color{75, 71, 65, 255};
+                if (tile.type == TileType::DOOR) color = Color{130, 90, 40, 255}; // Wooden tone
+                if (tile.type == TileType::TRAP) color = Color{120, 40, 40, 255}; // Reddish
 
-            DrawRectangle((int)tile.position.x, (int)tile.position.y, tileSize, tileSize, color);
-
-            // Subtle wall edge highlight (top-left light, bottom-right shadow)
-            if (tile.type == TileType::WALL) {
-                DrawLineV(
-                    {tile.position.x, tile.position.y},
-                    {tile.position.x, tile.position.y + (float)tileSize},
-                    Color{40, 38, 48, 255});
-                DrawLineV(
-                    {tile.position.x + (float)tileSize, tile.position.y},
-                    {tile.position.x + (float)tileSize, tile.position.y + (float)tileSize},
-                    Color{18, 16, 22, 255});
+                DrawRectangle((int)tile.position.x, (int)tile.position.y, tileSize, tileSize, color);
+                
+                // Procedural stone paving details (subtle)
+                if (tile.type == TileType::FLOOR) {
+                    // Small faint dots to simulate pebbles/texture
+                    if ((x*13 + y*17) % 5 == 0) DrawRectangle((int)tile.position.x + 4, (int)tile.position.y + 6, 2, 2, Color{60, 56, 50, 255});
+                    if ((x*23 + y*11) % 7 == 0) DrawRectangle((int)tile.position.x + 22, (int)tile.position.y + 18, 3, 2, Color{85, 80, 75, 255});
+                    
+                    // Faint grid for paving stones
+                    DrawRectangleLinesEx({tile.position.x, tile.position.y, (float)tileSize, (float)tileSize}, 1.0f, Color{65, 60, 55, 100});
+                }
+            } 
+            // 2. Draw Wall
+            else if (tile.type == TileType::WALL) {
+                // Determine if this wall has a floor tile below it (to draw the front face)
+                bool isExposedFace = (y + 1 < mapHeight && tiles[y + 1][x].type != TileType::WALL);
+                
+                // Top face (lighter, flat brick look)
+                Color topColor = Color{38, 36, 42, 255};
+                DrawRectangle((int)tile.position.x, (int)tile.position.y, tileSize, tileSize, topColor);
+                
+                // Procedural brick pattern on top face
+                DrawLineV({tile.position.x, tile.position.y + tileSize/2.0f}, {tile.position.x + tileSize, tile.position.y + tileSize/2.0f}, Color{28, 26, 32, 255});
+                if ((x+y) % 2 == 0) {
+                    DrawLineV({tile.position.x + tileSize/2.0f, tile.position.y}, {tile.position.x + tileSize/2.0f, tile.position.y + tileSize/2.0f}, Color{28, 26, 32, 255});
+                } else {
+                    DrawLineV({tile.position.x + tileSize/2.0f, tile.position.y + tileSize/2.0f}, {tile.position.x + tileSize/2.0f, tile.position.y + tileSize}, Color{28, 26, 32, 255});
+                }
+                
+                // If it has an exposed south face, draw a darker drop shadow/front face
+                if (isExposedFace) {
+                    Color frontColor = Color{20, 18, 24, 255};
+                    DrawRectangle((int)tile.position.x, (int)tile.position.y + tileSize - 8, tileSize, 8, frontColor);
+                } else {
+                    // Normal subtle edge highlights
+                    DrawLineV({tile.position.x, tile.position.y}, {tile.position.x, tile.position.y + (float)tileSize}, Color{50, 48, 58, 255});
+                    DrawLineV({tile.position.x + (float)tileSize, tile.position.y}, {tile.position.x + (float)tileSize, tile.position.y + (float)tileSize}, Color{25, 23, 28, 255});
+                }
             }
         }
     }
@@ -234,12 +251,37 @@ std::vector<Vector2> MapGenerator::getSpawnPositions(int count) {
 }
 
 Vector2 MapGenerator::resolveCollision(Rectangle bounds, Vector2 movement) {
-    Rectangle newBounds = {bounds.x + movement.x, bounds.y + movement.y, bounds.width, bounds.height};
+    Vector2 result = movement;
 
-    if (isWall(newBounds.x, newBounds.y) || isWall(newBounds.x + newBounds.width, newBounds.y) ||
-        isWall(newBounds.x, newBounds.y + newBounds.height) || isWall(newBounds.x + newBounds.width, newBounds.y + newBounds.height)) {
-        return {0, 0}; // No movement if collision
+    // Shrink bounds very slightly so being perfectly flush with a wall doesn't count as overlapping it
+    float shrink = 0.5f;
+    Rectangle b = { bounds.x + shrink, bounds.y + shrink, bounds.width - 2*shrink, bounds.height - 2*shrink };
+
+    // Try X axis alone
+    Rectangle testX = {b.x + movement.x, b.y, b.width, b.height};
+    bool hitX = isWall(testX.x, testX.y) || isWall(testX.x + testX.width, testX.y) ||
+                isWall(testX.x, testX.y + testX.height) || isWall(testX.x + testX.width, testX.y + testX.height);
+    if (hitX) result.x = 0;
+
+    // Try Y axis alone
+    Rectangle testY = {b.x, b.y + movement.y, b.width, b.height};
+    bool hitY = isWall(testY.x, testY.y) || isWall(testY.x + testY.width, testY.y) ||
+                isWall(testY.x, testY.y + testY.height) || isWall(testY.x + testY.width, testY.y + testY.height);
+    if (hitY) result.y = 0;
+
+    // If neither X nor Y hit independently, but combined diagonal hits a protruding corner:
+    if (!hitX && !hitY) {
+        Rectangle testXY = {b.x + movement.x, b.y + movement.y, b.width, b.height};
+        if (isWall(testXY.x, testXY.y) || isWall(testXY.x + testXY.width, testXY.y) ||
+            isWall(testXY.x, testXY.y + testXY.height) || isWall(testXY.x + testXY.width, testXY.y + testXY.height)) {
+            // Cancel the smaller movement component to slide around the corner
+            if (std::abs(movement.x) > std::abs(movement.y)) {
+                result.y = 0;
+            } else {
+                result.x = 0;
+            }
+        }
     }
 
-    return movement;
+    return result;
 }

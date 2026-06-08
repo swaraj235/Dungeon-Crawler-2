@@ -104,7 +104,7 @@ void HUD::drawStatsPanel(Game* game, Player* player) {
     py += barH + 8;
 
     // ── EXP bar
-    int expForNext = 100; // simplified — Config::EXP_FOR_LEVEL_2 * pow(scaling, level-1)
+    int expForNext = player->getExpNeeded();
     float expFrac = expForNext > 0
         ? (float)player->getExperience() / (float)expForNext : 0.0f;
     expFrac = std::max(0.0f, std::min(1.0f, expFrac));

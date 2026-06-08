@@ -1,4 +1,5 @@
 #include "Enemy.h"
+#include "Player.h"
 #include "Config.h"
 #include <iostream>
 #include <unordered_map>
@@ -105,6 +106,13 @@ void Enemy::draw() {
 
 void Enemy::updateAI(float deltaTime) {
     if (!target || !target->getIsAlive()) return;
+
+    if (Player* p = dynamic_cast<Player*>(target)) {
+        if (p->getIsStealthed()) {
+            currentState = AIState::IDLE;
+            return; // Ignore player completely while stealthed
+        }
+    }
 
     float distanceToTarget = Vector2Distance(position, target->getPosition());
 
