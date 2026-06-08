@@ -19,6 +19,9 @@ Game::Game() : isRunning(true), isPaused(false), gameOver(false), gameTime(0),
     // ONLY initialize window, NOT the game!
     InitWindow(Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT, Config::GAME_TITLE);
     SetTargetFPS(Config::TARGET_FPS);
+    
+    // Ensure we are in the correct directory to load assets
+    ChangeDirectory(GetApplicationDirectory());
 
     // Initialize menu FIRST
     mainMenu = std::make_unique<MainMenu>();
@@ -32,9 +35,8 @@ Game::~Game() {
 }
 
 void Game::initialize() {
-    SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_WINDOW_MAXIMIZED);
-    InitWindow(Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT, Config::GAME_TITLE);
-    SetTargetFPS(Config::TARGET_FPS);
+    // Window already created in constructor — just apply flags
+    SetWindowState(FLAG_WINDOW_RESIZABLE);
 
     int screenWidth = GetScreenWidth();
     int screenHeight = GetScreenHeight();

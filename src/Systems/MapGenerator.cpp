@@ -131,13 +131,35 @@ void MapGenerator::draw() {
         for (int x = 0; x < mapWidth; x++) {
             Tile& tile = tiles[y][x];
 
-            Color color = DARKGRAY;
-            if (tile.type == TileType::FLOOR) color = Color{100, 100, 100, 255};
-            else if (tile.type == TileType::DOOR) color = ORANGE;
-            else if (tile.type == TileType::TRAP) color = RED;
+            Color color;
+            if (tile.type == TileType::FLOOR) {
+                // Subtle checkerboard for floor depth
+                if ((x + y) % 2 == 0)
+                    color = Color{78, 74, 68, 255};
+                else
+                    color = Color{72, 68, 62, 255};
+            } else if (tile.type == TileType::DOOR) {
+                color = Color{180, 120, 40, 255};
+            } else if (tile.type == TileType::TRAP) {
+                color = Color{140, 30, 30, 255};
+            } else {
+                // Wall — darker to contrast with floor
+                color = Color{28, 26, 32, 255};
+            }
 
             DrawRectangle((int)tile.position.x, (int)tile.position.y, tileSize, tileSize, color);
-            DrawRectangleLines((int)tile.position.x, (int)tile.position.y, tileSize, tileSize, BLACK);
+
+            // Subtle wall edge highlight (top-left light, bottom-right shadow)
+            if (tile.type == TileType::WALL) {
+                DrawLineV(
+                    {tile.position.x, tile.position.y},
+                    {tile.position.x, tile.position.y + (float)tileSize},
+                    Color{40, 38, 48, 255});
+                DrawLineV(
+                    {tile.position.x + (float)tileSize, tile.position.y},
+                    {tile.position.x + (float)tileSize, tile.position.y + (float)tileSize},
+                    Color{18, 16, 22, 255});
+            }
         }
     }
     // Draw decorations

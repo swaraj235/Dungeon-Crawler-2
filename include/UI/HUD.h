@@ -31,4 +31,5 @@ private:
     void drawControlsPanel();
     void drawBuffIndicators(Player* player);
     void drawMiniMap(Game* game);
+    void drawPotionBar(Player* player);
 };
