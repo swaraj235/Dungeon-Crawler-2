@@ -17,7 +17,7 @@ enum class EnemyType {
 };
 
 enum class EnemyTier { D, C, B, A, S };
-enum class AIState { IDLE, CHASING, ATTACKING };
+enum class AIState { IDLE, WANDERING, CHASING, ATTACKING };
 
 class Enemy : public Character {
 protected:
@@ -34,6 +34,19 @@ protected:
 
     Character* target;
     AIState currentState;
+
+    // Direction (for sprite flip)
+    bool facingRight;
+
+    // Wander / patrol (IDLE state roaming)
+    float wanderTimer;
+    Vector2 wanderTarget;
+
+    // Windup animation: counts DOWN before attack lands
+    // Game.cpp reads this to fire addEnemyWindup() / addEnemyHitImpact()
+    float windupTimer;       // set to attackCooldown * 0.4f on CHASING→attack
+    bool  windupFired;       // has the windup effect been fired for this swing?
+    bool  justAttacked;      // set true in performAttack(); cleared by Game.cpp after reading
 
     // Visual effects
     float hitFlashTime;
@@ -62,7 +75,18 @@ public:
     EnemyType getEnemyType() const { return enemyType; }
     EnemyTier getTier() const { return tier; }
     int getAttackDamage() const { return attackDamage; }
+    bool getFacingRight() const { return facingRight; }
+    EnemyType getType() const { return enemyType; }
     void setTarget(Character* t) { target = t; }
+    Color getDisplayColor() const { return displayColor; }
+
+    // Windup animation state — read by Game.cpp to fire EffectSystem events
+    float getWindupTimer() const { return windupTimer; }
+    bool  isWindupFired()  const { return windupFired; }
+    void  markWindupFired()      { windupFired = true; }
+    AIState getAIState()   const { return currentState; }
+    bool  getJustAttacked() const { return justAttacked; }
+    void  clearJustAttacked()    { justAttacked = false; }
 
     // Factory methods for each enemy type
     static std::unique_ptr<Enemy> create(EnemyType type, int playerLevel);

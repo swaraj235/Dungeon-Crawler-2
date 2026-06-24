@@ -20,7 +20,9 @@ Enemy::Enemy(EnemyType type, int hp, int lvl, const std::string& spritePath,
     : Character(hp, lvl, spritePath, name), enemyType(type), tier(EnemyTier::D),
       speed(spd), attackDamage(atk), attackCooldown(2.5f), lastAttackTime(0),
       aggroRange(aggro), attackRange(atkRange), target(nullptr),
-      currentState(AIState::IDLE), hitFlashTime(0) {
+      currentState(AIState::IDLE), facingRight(true),
+      wanderTimer(0.0f), wanderTarget({0, 0}),
+      windupTimer(0.0f), windupFired(false), justAttacked(false), hitFlashTime(0) {
 
     // Assign colors based on enemy type
     switch (type) {
@@ -90,22 +92,59 @@ void Enemy::draw() {
     }
 
     if (sprite.id != 0) {
-        DrawTexture(sprite, static_cast<int>(position.x), static_cast<int>(position.y), tintColor);
+        // Flip sprite based on movement direction
+        Rectangle src = {
+            facingRight ? 0.0f : (float)sprite.width,
+            0.0f,
+            facingRight ? (float)sprite.width : -(float)sprite.width,
+            (float)sprite.height
+        };
+        DrawTextureRec(sprite, src, position, tintColor);
     } else {
+        // Fallback rectangle — draw a small direction indicator
         DrawRectangle((int)position.x, (int)position.y, 32, 32, tintColor);
+        // Direction arrow: small triangle on the facing side
+        float arrowX = facingRight ? position.x + 34 : position.x - 6;
+        DrawTriangle(
+            {arrowX, position.y + 12},
+            {arrowX, position.y + 20},
+            {facingRight ? arrowX + 5.0f : arrowX - 5.0f, position.y + 16},
+            Color{255, 255, 255, 180}
+        );
     }
 
     // Health bar
     DrawRectangle((int)position.x, (int)position.y - 10, 32, 3, BLACK);
     float healthPercent = (float)health / maxHealth;
-    DrawRectangle((int)position.x, (int)position.y - 10, (int)(32 * healthPercent), 3, RED);
+    Color hpColor = healthPercent > 0.5f ? GREEN : (healthPercent > 0.25f ? ORANGE : RED);
+    DrawRectangle((int)position.x, (int)position.y - 10, (int)(32 * healthPercent), 3, hpColor);
 
     // Name
     DrawText(name.c_str(), (int)position.x - 10, (int)position.y - 25, 10, WHITE);
 }
 
 void Enemy::updateAI(float deltaTime) {
-    if (!target || !target->getIsAlive()) return;
+    if (!target || !target->getIsAlive()) {
+        // Wander randomly when no target
+        wanderTimer -= deltaTime;
+        if (wanderTimer <= 0.0f) {
+            wanderTimer = 1.5f + (rand() % 200) * 0.01f; // 1.5–3.5s between targets
+            float angle = (rand() % 360) * 3.14159f / 180.0f;
+            float dist  = 40.0f + rand() % 60;
+            wanderTarget = {position.x + cosf(angle) * dist,
+                            position.y + sinf(angle) * dist};
+        }
+        // Move toward wander target slowly
+        Vector2 dir = {wanderTarget.x - position.x, wanderTarget.y - position.y};
+        float d = sqrtf(dir.x * dir.x + dir.y * dir.y);
+        if (d > 4.0f) {
+            dir.x /= d; dir.y /= d;
+            position.x += dir.x * speed * 0.3f * deltaTime;
+            position.y += dir.y * speed * 0.3f * deltaTime;
+            facingRight = dir.x >= 0;
+        }
+        return;
+    }
 
     if (Player* p = dynamic_cast<Player*>(target)) {
         if (p->getIsStealthed()) {
@@ -116,19 +155,55 @@ void Enemy::updateAI(float deltaTime) {
 
     float distanceToTarget = Vector2Distance(position, target->getPosition());
 
+    // Tick windup timer
+    if (windupTimer > 0.0f) {
+        windupTimer -= deltaTime;
+    }
+
     switch (currentState) {
         case AIState::IDLE:
+        case AIState::WANDERING: {
+            // Wander while idle
+            wanderTimer -= deltaTime;
+            if (wanderTimer <= 0.0f) {
+                wanderTimer = 1.5f + (rand() % 200) * 0.01f;
+                float angle = (rand() % 360) * 3.14159f / 180.0f;
+                float dist  = 40.0f + rand() % 60;
+                wanderTarget = {position.x + cosf(angle) * dist,
+                                position.y + sinf(angle) * dist};
+            }
+            Vector2 wdir = {wanderTarget.x - position.x, wanderTarget.y - position.y};
+            float wd = sqrtf(wdir.x * wdir.x + wdir.y * wdir.y);
+            if (wd > 4.0f) {
+                wdir.x /= wd; wdir.y /= wd;
+                position.x += wdir.x * speed * 0.25f * deltaTime;
+                position.y += wdir.y * speed * 0.25f * deltaTime;
+                facingRight = wdir.x >= 0;
+            }
+            // Aggro check
             if (distanceToTarget <= aggroRange) {
                 currentState = AIState::CHASING;
+                windupFired = false;
             }
             break;
+        }
 
         case AIState::CHASING:
-            if (distanceToTarget <= attackRange && canAttack()) {
-                currentState = AIState::ATTACKING;
-                performAttack();
+            if (distanceToTarget <= attackRange) {
+                // Pre-attack: arm the windup timer so Game.cpp can show the telegraph
+                if (!windupFired) {
+                    windupTimer  = attackCooldown * 0.4f;
+                    windupFired  = false; // Game.cpp will flip this after firing effect
+                }
+                if (canAttack()) {
+                    currentState = AIState::ATTACKING;
+                    performAttack();
+                    windupFired = false; // reset for next swing
+                    windupTimer = 0.0f;
+                }
             } else if (distanceToTarget > aggroRange * 1.5f) {
-                currentState = AIState::IDLE;
+                currentState = AIState::WANDERING;
+                wanderTimer  = 0.0f; // pick new wander target immediately
             } else {
                 moveTowardsTarget(deltaTime);
             }
@@ -139,6 +214,8 @@ void Enemy::updateAI(float deltaTime) {
                 currentState = AIState::CHASING;
             } else if (canAttack()) {
                 performAttack();
+                windupFired = false;
+                windupTimer = 0.0f;
             }
             break;
     }
@@ -154,6 +231,8 @@ void Enemy::moveTowardsTarget(float deltaTime) {
         direction = Vector2Normalize(direction);
         position.x += direction.x * speed * deltaTime;
         position.y += direction.y * speed * deltaTime;
+        // Update facing direction based on movement
+        facingRight = direction.x >= 0;
     }
 }
 
@@ -161,9 +240,10 @@ void Enemy::performAttack() {
     if (lastAttackTime < attackCooldown) return;
 
     lastAttackTime = 0;
+    justAttacked = true;   // signals Game.cpp to play the attack animation
 
     if (target && target->getIsAlive()) {
-        int damage = attackDamage / 4; // Reduced damage
+        int damage = attackDamage;
         target->takeDamage(damage);
     }
 }
