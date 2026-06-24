@@ -126,6 +126,7 @@ public:
     const std::vector<Spell>& getSpells() const { return spells; }
     const std::vector<InventoryItem>& getInventory() const { return inventory; }
     bool getIsStealthed() const { return isStealthed; }
+    bool getFacingRight()  const { return facingRight; }
     float getSpeedBuffTime() const { return speedBuffTime; }
     float getRageBuffTime() const { return rageBuffTime; }
     int getLevel() const { return level; }

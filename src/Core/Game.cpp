@@ -283,6 +283,73 @@ void Game::updateEnemies(float deltaTime) {
 
         Vector2 resolvedMovement = gameMap->resolveCollision(enemyBounds, movement);
         enemy->setPosition({oldPos.x + resolvedMovement.x, oldPos.y + resolvedMovement.y});
+
+        // ── Windup telegraph animation ───────────────────────────────────
+        // Fire the windup effect once when the enemy enters attack range
+        // (windupTimer > 0 means it just started winding up)
+        if (enemy->getWindupTimer() > 0.0f && !enemy->isWindupFired() &&
+            enemy->getAIState() == AIState::CHASING) {
+            Vector2 ec = {enemy->getPosition().x + 16, enemy->getPosition().y + 16};
+            effectSystem.addEnemyWindup(ec);
+            enemy->markWindupFired(); // suppress repeat until next swing
+        }
+
+        // ── Enemy Attack Animation ───────────────────────────────────────
+        if (enemy->getJustAttacked()) {
+            Vector2 ec = {enemy->getPosition().x + 16, enemy->getPosition().y + 16};
+            bool right = enemy->getFacingRight();
+            
+            switch (enemy->getType()) {
+                // Melee slashers
+                case EnemyType::GOBLIN:
+                case EnemyType::SKELETON:
+                case EnemyType::HOUND:
+                case EnemyType::WEREWOLF:
+                case EnemyType::SKELETON_KNIGHT:
+                    effectSystem.addEnemyAttackSlash(ec, right);
+                    break;
+                // Magic casters
+                case EnemyType::MAGE:
+                case EnemyType::WITCH:
+                case EnemyType::NECROMANCER:
+                case EnemyType::LIGHT_SPIRIT:
+                case EnemyType::ELF_GIRL:
+                    effectSystem.addEnemyAttackMagic(ec);
+                    break;
+                // Heavy stompers
+                case EnemyType::STONE_GOLEM:
+                case EnemyType::LAVA_GOLEM:
+                case EnemyType::GOBLIN_GIANT:
+                case EnemyType::MINOTAUR:
+                case EnemyType::CYCLOPS:
+                case EnemyType::ANCIENT_MUMMY:
+                    effectSystem.addEnemyAttackStomp(ec);
+                    break;
+                // Biters / snap attacks
+                case EnemyType::BAT:
+                case EnemyType::CERBERUS:
+                case EnemyType::CHIMERA_ANT:
+                case EnemyType::HARPY_QUEEN:
+                    effectSystem.addEnemyAttackBite(ec, right);
+                    break;
+                // Shadow / dark attacks
+                case EnemyType::IMP:
+                case EnemyType::DARK_SPIRIT:
+                case EnemyType::FALLEN_SHADOW_PALADIN:
+                    effectSystem.addEnemyAttackShadow(ec);
+                    break;
+                // Fire attacks
+                case EnemyType::FIRE_SPIRIT:
+                case EnemyType::SALAMANDER_MAN:
+                case EnemyType::SLIME: // Give slime a fiery burst for fun
+                    effectSystem.addEnemyAttackFire(ec);
+                    break;
+                default:
+                    effectSystem.addEnemyAttackSlash(ec, right);
+                    break;
+            }
+            enemy->clearJustAttacked();
+        }
     }
 }
 
@@ -325,6 +392,7 @@ void Game::updateDamageNumbers(float deltaTime) {
 
 void Game::updateParticles(float deltaTime) {
     particleSystem.update(deltaTime);
+    effectSystem.update(deltaTime);
 }
 
 void Game::checkPlayerAttack() {
@@ -341,6 +409,11 @@ void Game::checkPlayerAttack() {
         bool crit = roll(rng) < 0.15f;
         int finalDamage = crit ? (int)(baseDamage * 1.8f) : baseDamage;
 
+        // ── Slash animation ──────────────────────────────────────────────
+        Vector2 playerCenter = {player->getPosition().x + 16,
+                                player->getPosition().y + 16};
+        effectSystem.addAttackSlash(playerCenter, player->getFacingRight(), crit);
+
         for (auto& enemy : enemies) {
             if (!enemy->getIsAlive()) continue;
 
@@ -348,20 +421,35 @@ void Game::checkPlayerAttack() {
                 hitAny = true;
                 enemy->takeDamage(finalDamage);
 
+                // Hit impact flash at enemy position
+                Vector2 ec = {enemy->getPosition().x + 16, enemy->getPosition().y + 16};
+                effectSystem.addEnemyHitImpact(ec);
+
                 if (enemy->getIsAlive()) {
                     enemy->flashHit();
-                    Vector2 center = {attackRange.x + attackRange.width / 2, attackRange.y + attackRange.height / 2};
+                    Vector2 center = {attackRange.x + attackRange.width / 2,
+                                      attackRange.y + attackRange.height / 2};
                     enemy->applyKnockback(center, 20.0f);
                 }
 
                 particleSystem.addBlood(enemy->getPosition(), 5);
-                damageNumbers.emplace_back(Vector2{enemy->getPosition().x, enemy->getPosition().y - 10},
-                                          finalDamage, crit ? ORANGE : RED);
+                damageNumbers.emplace_back(
+                    Vector2{enemy->getPosition().x, enemy->getPosition().y - 10},
+                    finalDamage, crit ? ORANGE : RED);
 
                 if (!enemy->getIsAlive()) {
+                    // ── Death burst (enemy's own colour) ──────────────────
+                    effectSystem.addEnemyDeathBurst(ec, enemy->getDisplayColor());
                     particleSystem.addExplosion(enemy->getPosition(), ORANGE, 10);
                     int expReward = enemy->getLevel() * 25;
+                    int levelBefore = player->getLevel();
                     player->gainExperience(expReward);
+                    // Level-up burst animation
+                    if (player->getLevel() > levelBefore) {
+                        Vector2 pc = {player->getPosition().x + 16,
+                                      player->getPosition().y + 16};
+                        effectSystem.addLevelUpBurst(pc);
+                    }
                     score += enemy->getLevel() * 100;
                     enemiesKilled++;
 
@@ -584,14 +672,33 @@ void Game::castFireball() {
 
     Rectangle range = player->getAttackRange();
     int damage = player->computeAttackDamage() + 15;
+    Vector2 playerCenter = {player->getPosition().x + 16, player->getPosition().y + 16};
+
+    // Find nearest enemy for projectile target
+    Enemy* nearestTarget = nullptr;
+    float minDist = 1e9f;
+    for (auto& enemy : enemies) {
+        if (!enemy->getIsAlive()) continue;
+        float d = Vector2Distance(playerCenter, enemy->getPosition());
+        if (d < minDist) { minDist = d; nearestTarget = enemy.get(); }
+    }
+    if (nearestTarget) {
+        Vector2 targetCenter = {nearestTarget->getPosition().x + 16,
+                                nearestTarget->getPosition().y + 16};
+        effectSystem.addFireballProjectile(playerCenter, targetCenter);
+    } else {
+        // No target — burst at player
+        effectSystem.addFireball(playerCenter);
+    }
 
     for (auto& enemy : enemies) {
         if (enemy->getIsAlive() && CheckCollisionRecs(range, enemy->getBounds())) {
             enemy->takeDamage(damage);
             enemy->flashHit(0.15f);
             particleSystem.addMagic(enemy->getPosition(), ORANGE, 10);
-            damageNumbers.emplace_back(Vector2{enemy->getPosition().x, enemy->getPosition().y - 12},
-                                      damage, ORANGE);
+            damageNumbers.emplace_back(
+                Vector2{enemy->getPosition().x, enemy->getPosition().y - 12},
+                damage, ORANGE);
         }
     }
 
@@ -623,24 +730,27 @@ void Game::castChainLightning() {
             float dx = enemyPos.x - currentPos.x;
             float dy = enemyPos.y - currentPos.y;
             float dist = dx * dx + dy * dy;
-
-            if (dist < minDist) {
-                minDist = dist;
-                nearest = enemy;
-            }
+            if (dist < minDist) { minDist = dist; nearest = enemy; }
         }
 
         if (!nearest) break;
 
+        Vector2 nearestCenter = {nearest->getPosition().x + 16,
+                                 nearest->getPosition().y + 16};
+        // ── Jagged lightning bolt visual ─────────────────────────────────
+        effectSystem.addLightningBolt(currentPos, nearestCenter);
+
         nearest->takeDamage(damage);
         nearest->flashHit(0.1f);
         particleSystem.addMagic(nearest->getPosition(), YELLOW, 10);
-        damageNumbers.emplace_back(Vector2{nearest->getPosition().x, nearest->getPosition().y - 12},
-                                  damage, YELLOW);
+        damageNumbers.emplace_back(
+            Vector2{nearest->getPosition().x, nearest->getPosition().y - 12},
+            damage, YELLOW);
 
-        currentPos = {nearest->getPosition().x + 8, nearest->getPosition().y + 8};
-        availableTargets.erase(std::remove(availableTargets.begin(), availableTargets.end(), nearest),
-                              availableTargets.end());
+        currentPos = nearestCenter;
+        availableTargets.erase(
+            std::remove(availableTargets.begin(), availableTargets.end(), nearest),
+            availableTargets.end());
     }
 
     player->castSpell(SpellType::CHAIN_LIGHTNING);
@@ -652,15 +762,17 @@ void Game::castFrostWave() {
     if (!player->canCast(SpellType::FROST_NOVA)) return;
 
     Vector2 playerPos = player->getPosition();
+    Vector2 playerCenter = {playerPos.x + 16, playerPos.y + 16};
     float radius = 120.0f;
     int damage = player->computeAttackDamage() + 10;
+
+    // ── Expanding ice nova burst ─────────────────────────────────────────
+    effectSystem.addFrostNovaBurst(playerCenter);
 
     for (auto& enemy : enemies) {
         if (!enemy->getIsAlive()) continue;
 
         Vector2 enemyCenter = {enemy->getPosition().x + 16, enemy->getPosition().y + 16};
-        Vector2 playerCenter = {playerPos.x + 16, playerPos.y + 16};
-
         float dx = enemyCenter.x - playerCenter.x;
         float dy = enemyCenter.y - playerCenter.y;
 
@@ -668,9 +780,11 @@ void Game::castFrostWave() {
             enemy->takeDamage(damage);
             enemy->flashHit(0.2f);
             enemy->applyKnockback(playerPos, 15.0f);
+            effectSystem.addEnemyHitImpact(enemyCenter);
             particleSystem.addMagic(enemy->getPosition(), SKYBLUE, 8);
-            damageNumbers.emplace_back(Vector2{enemy->getPosition().x, enemy->getPosition().y - 12},
-                                      damage, SKYBLUE);
+            damageNumbers.emplace_back(
+                Vector2{enemy->getPosition().x, enemy->getPosition().y - 12},
+                damage, SKYBLUE);
         }
     }
 
@@ -684,15 +798,17 @@ void Game::castWhirlwind() {
     if (!player->canCast(SpellType::WHIRLWIND)) return;
 
     Vector2 playerPos = player->getPosition();
+    Vector2 playerCenter = {playerPos.x + 16, playerPos.y + 16};
     float radius = 80.0f;
     int damage = player->computeAttackDamage() + 20;
+
+    // ── Spinning blade vortex visual ─────────────────────────────────────
+    effectSystem.addWhirlwindActive(playerCenter);
 
     for (auto& enemy : enemies) {
         if (!enemy->getIsAlive()) continue;
 
         Vector2 enemyCenter = {enemy->getPosition().x + 16, enemy->getPosition().y + 16};
-        Vector2 playerCenter = {playerPos.x + 16, playerPos.y + 16};
-
         float dx = enemyCenter.x - playerCenter.x;
         float dy = enemyCenter.y - playerCenter.y;
 
@@ -700,9 +816,11 @@ void Game::castWhirlwind() {
             enemy->takeDamage(damage);
             enemy->flashHit(0.1f);
             enemy->applyKnockback(playerPos, 25.0f);
+            effectSystem.addEnemyHitImpact(enemyCenter);
             particleSystem.addExplosion(enemy->getPosition(), RED, 8);
-            damageNumbers.emplace_back(Vector2{enemy->getPosition().x, enemy->getPosition().y - 12},
-                                      damage, RED);
+            damageNumbers.emplace_back(
+                Vector2{enemy->getPosition().x, enemy->getPosition().y - 12},
+                damage, RED);
         }
     }
 
@@ -828,6 +946,9 @@ void Game::draw() {
 
     // Draw particles
     particleSystem.draw();
+
+    // Draw visual effects (slashes, spells, impacts, telegraphs)
+    effectSystem.draw();
 
     // Draw damage numbers
     drawDamageNumbers();
