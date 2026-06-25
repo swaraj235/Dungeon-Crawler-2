@@ -21,7 +21,7 @@ namespace Config {
     constexpr int DAMAGE_PER_LEVEL = 6;
     constexpr float SPEED_PER_LEVEL = 3.0f;
     constexpr int EXP_FOR_LEVEL_2 = 100;
-    constexpr float EXP_SCALING = 1.0f; // Each level needs 1.5x more exp
+    constexpr float EXP_SCALING = 1.25f; // Each level needs 1.25x more exp
 
     // Combat
     constexpr float ATTACK_RANGE = 80.0f;

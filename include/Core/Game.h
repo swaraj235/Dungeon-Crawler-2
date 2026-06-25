@@ -30,6 +30,7 @@ private:
     bool isRunning;
     bool isPaused;
     bool gameOver;
+    bool quitConfirmation;
     float gameTime;
     int currentFloor;
 
@@ -114,6 +115,7 @@ private:
     void castWhirlwind();
     void castShadowBurst();
     void castBlinkStrike();
+    void handleSpellKill(Enemy* enemy); // shared post-kill logic for all spells
 
     void drawDamageNumbers();
     void generateItemDrops(Enemy* enemy);

@@ -11,7 +11,7 @@
 #include <cstdio>
 #include <cfloat>
 
-Game::Game() : isRunning(true), isPaused(false), gameOver(false), gameTime(0),
+Game::Game() : isRunning(true), isPaused(false), gameOver(false), quitConfirmation(false), gameTime(0),
                currentFloor(1), score(0), enemiesKilled(0),
                rng(std::random_device{}()), enemySpawnTimer(0), maxEnemies(3),
                cameraShakeTime(0), cameraShakeIntensity(0), attackFlashTimer(0),
@@ -198,6 +198,15 @@ void Game::update(float deltaTime) {
 }
 
 void Game::handleInput() {
+    if (quitConfirmation) {
+        if (IsKeyPressed(KEY_Y)) {
+            isRunning = false;
+        } else if (IsKeyPressed(KEY_N) || IsKeyPressed(KEY_ESCAPE)) {
+            quitConfirmation = false;
+        }
+        return;
+    }
+
     // Toggle inventory
     if (IsKeyPressed(KEY_I)) {
         inventoryOpen = !inventoryOpen;
@@ -237,12 +246,17 @@ void Game::handleInput() {
     }
 
     // Normal game controls (rest stays the same)
+    // ESC = primary pause/resume (bug #7 — previously ESC did nothing in gameplay)
+    if (IsKeyPressed(KEY_ESCAPE)) {
+        isPaused = !isPaused;
+    }
+
     if (IsKeyPressed(KEY_P)) {
         isPaused = !isPaused;
     }
 
     if (IsKeyPressed(KEY_Q)) {
-        isRunning = false;
+        quitConfirmation = true;
     }
 
     if (IsKeyPressed(KEY_F11)) {
@@ -762,6 +776,7 @@ void Game::castFireball() {
     for (auto& enemy : enemies) {
         if (enemy->getIsAlive() && CheckCollisionRecs(range, enemy->getBounds())) {
             enemy->takeDamage(damage);
+            if (!enemy->getIsAlive()) { handleSpellKill(enemy.get()); continue; }
             enemy->flashHit(0.15f);
             particleSystem.addMagic(enemy->getPosition(), ORANGE, 10);
             damageNumbers.emplace_back(
@@ -809,6 +824,14 @@ void Game::castChainLightning() {
         effectSystem.addLightningBolt(currentPos, nearestCenter);
 
         nearest->takeDamage(damage);
+        handleSpellKill(nearest); // award EXP / handle Paladin break
+        if (!nearest->getIsAlive()) {
+            currentPos = nearestCenter;
+            availableTargets.erase(
+                std::remove(availableTargets.begin(), availableTargets.end(), nearest),
+                availableTargets.end());
+            continue;
+        }
         nearest->flashHit(0.1f);
         particleSystem.addMagic(nearest->getPosition(), YELLOW, 10);
         damageNumbers.emplace_back(
@@ -846,6 +869,7 @@ void Game::castFrostWave() {
 
         if (dx * dx + dy * dy <= radius * radius) {
             enemy->takeDamage(damage);
+            if (!enemy->getIsAlive()) { handleSpellKill(enemy.get()); continue; }
             enemy->flashHit(0.2f);
             enemy->applyKnockback(playerPos, 15.0f);
             effectSystem.addEnemyHitImpact(enemyCenter);
@@ -882,6 +906,7 @@ void Game::castWhirlwind() {
 
         if (dx * dx + dy * dy <= radius * radius) {
             enemy->takeDamage(damage);
+            if (!enemy->getIsAlive()) { handleSpellKill(enemy.get()); continue; }
             enemy->flashHit(0.1f);
             enemy->applyKnockback(playerPos, 25.0f);
             effectSystem.addEnemyHitImpact(enemyCenter);
@@ -917,7 +942,11 @@ void Game::castShadowBurst() {
 
         if (dx * dx + dy * dy <= radius * radius) {
             enemy->takeDamage(damage);
-            effectSystem.addEnemyAttackShadow(enemyCenter); // Visual tint/hit
+            if (!enemy->getIsAlive()) { handleSpellKill(enemy.get()); continue; }
+            effectSystem.addEnemyAttackShadow(enemyCenter);
+            damageNumbers.emplace_back(
+                Vector2{enemy->getPosition().x, enemy->getPosition().y - 12},
+                damage, PURPLE);
         }
     }
     
@@ -957,14 +986,61 @@ void Game::castBlinkStrike() {
         // Huge damage (3x crit)
         int damage = player->computeAttackDamage() * 3;
         nearestEnemy->takeDamage(damage);
+        handleSpellKill(nearestEnemy); // award EXP / handle Paladin break
 
         // Arrive impact
         effectSystem.addBlinkImpact({destPos.x + 16, destPos.y + 16});
         particleSystem.addExplosion(destPos, Color{255, 255, 255, 255}, 15);
+        if (nearestEnemy->getIsAlive()) {
+            damageNumbers.emplace_back(
+                Vector2{nearestEnemy->getPosition().x, nearestEnemy->getPosition().y - 12},
+                damage, WHITE);
+        }
         soundManager.playSound(SoundType::ENEMY_HIT);
 
         player->castSpell(SpellType::BLINK_STRIKE);
     }
+}
+
+// ─── Shared post-kill handler for all spell damage ───────────────────────────
+// Call this immediately after enemy->takeDamage() if the enemy is now dead.
+void Game::handleSpellKill(Enemy* enemy) {
+    if (!enemy || enemy->getIsAlive()) return;
+
+    Vector2 ec = {enemy->getPosition().x + 16, enemy->getPosition().y + 16};
+
+    // Shadow Paladin special case — break him instead of killing (bug #5)
+    if (enemy->getEnemyType() == EnemyType::FALLEN_SHADOW_PALADIN && !shadowPaladinTamed) {
+        FallenShadowPaladin* paladin = dynamic_cast<FallenShadowPaladin*>(enemy);
+        if (paladin && paladin->getBossInstance()) {
+            paladin->heal(paladin->getMaxHealth());
+            paladin->setBroken(true);
+            canTamePaladin = true;
+            return; // don't award EXP yet; wait for taming
+        }
+    }
+
+    // Standard death rewards
+    effectSystem.addEnemyDeathBurst(ec, enemy->getDisplayColor());
+    particleSystem.addExplosion(enemy->getPosition(), ORANGE, 10);
+
+    int expReward = enemy->getLevel() * 25;
+    int levelBefore = player->getLevel();
+    player->gainExperience(expReward);
+
+    if (player->getLevel() > levelBefore) {
+        Vector2 pc = {player->getPosition().x + 16, player->getPosition().y + 16};
+        effectSystem.addLevelUpBurst(pc);
+    }
+
+    score += enemy->getLevel() * 100;
+    enemiesKilled++;
+
+    damageNumbers.emplace_back(
+        Vector2{enemy->getPosition().x + 15, enemy->getPosition().y - 15},
+        expReward, YELLOW);
+
+    generateItemDrops(enemy);
 }
 
 void Game::generateNewFloor() {
@@ -1012,13 +1088,17 @@ void Game::generateItemDrops(Enemy* enemy) {
     }
 
     // Random loot
-    if (chance <= 10) {
-        // Rare items
+    // Seeds of Evolution get their own dedicated 15% chance (bug #3 - was too rare)
+    if (chance <= 15) {
+        player->addItem("Seeds of Evolution", 1);
+        particleSystem.addMagic(enemy->getPosition(), Color{0, 220, 100, 255}, 14);
+    }
+    else if (chance <= 25) {
+        // Other rare items
         std::vector<ItemType> rareItems = {
             ItemType::HOLY_WATER_OF_LIFE,
             ItemType::STARDUST,
             ItemType::PALADIN_NECKLACE,
-            ItemType::SEEDS_OF_EVOLUTION,
             ItemType::MYSTICAL_RUNE
         };
         std::uniform_int_distribution<int> rareDist(0, rareItems.size() - 1);
@@ -1118,14 +1198,19 @@ void Game::draw() {
 
     if (loreTimer > 0 && !loreMessage.empty()) {
         int textWidth = MeasureText(loreMessage.c_str(), 20);
-        // We can draw it near the bottom center
+        // Centered box at the bottom
         DrawRectangle(GetScreenWidth()/2 - 300, GetScreenHeight() - 150, 600, 100, Fade(BLACK, 0.7f));
         DrawRectangleLines(GetScreenWidth()/2 - 300, GetScreenHeight() - 150, 600, 100, PURPLE);
-        DrawText(loreMessage.c_str(), GetScreenWidth()/2 - textWidth/2 + 100, GetScreenHeight() - 130, 20, LIGHTGRAY);
+        DrawText(loreMessage.c_str(), GetScreenWidth()/2 - textWidth/2, GetScreenHeight() - 115, 18, LIGHTGRAY);
     }
 
     if (gameOver) {
         drawGameOver();
+    } else if (quitConfirmation) {
+        DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), Fade(BLACK, 0.8f));
+        const char* prompt = "Are you sure you want to quit? (Y/N)";
+        int promptWidth = MeasureText(prompt, 30);
+        DrawText(prompt, GetScreenWidth() / 2 - promptWidth / 2, GetScreenHeight() / 2 - 15, 30, WHITE);
     } else if (isPaused) {
         drawPauseMenu();
     }
@@ -1206,7 +1291,7 @@ void Game::drawPauseMenu() {
     DrawRectangle(0, 0, screenWidth, screenHeight, Fade(BLACK, 0.5f));
 
     std::string pauseText = "PAUSED";
-    std::string resumeText = "Press P to Resume | Ctrl+S to Save | Q to Quit";
+    std::string resumeText = "Press [ESC] to Resume  |  Ctrl+S to Save  |  Q to Quit";
 
     int pauseWidth = MeasureText(pauseText.c_str(), 36);
     DrawText(pauseText.c_str(), (screenWidth - pauseWidth) / 2, screenHeight / 2 - 20, 36, WHITE);

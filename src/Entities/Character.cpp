@@ -33,9 +33,18 @@ bool Character::checkCollision(const Character& other) const {
 }
 
 Rectangle Character::getBounds() const {
-    float width = (sprite.id != 0) ? (float)sprite.width : 32.0f;
-    float height = (sprite.id != 0) ? (float)sprite.height : 32.0f;
-    return Rectangle{position.x, position.y, width, height};
+    // Use a tight 20x20 collision box centered on the sprite to avoid
+    // getting stuck in diagonal 2-tile corridors due to oversized hitbox.
+    constexpr float colW = 20.0f;
+    constexpr float colH = 20.0f;
+    float sprW = (sprite.id != 0) ? (float)sprite.width  : 32.0f;
+    float sprH = (sprite.id != 0) ? (float)sprite.height : 32.0f;
+    return Rectangle{
+        position.x + (sprW - colW) * 0.5f,
+        position.y + (sprH - colH) * 0.5f + 4.0f, // slight downward bias (feet)
+        colW,
+        colH
+    };
 }
 
 void Character::setHealth(int hp) {
