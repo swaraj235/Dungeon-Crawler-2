@@ -156,8 +156,39 @@ void EffectSystem::addEnemyAttackFire(Vector2 center) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  UPDATE
+//  NEW: PLAYER SPELL VFX
 // ─────────────────────────────────────────────────────────────────────────────
+
+void EffectSystem::addShadowBurstRing(Vector2 center) {
+    // Phase 1 — fast dark implosion gather (inward pulse)
+    effects.emplace_back(center, EffectType::SHADOW_BURST_RING, 0.85f, 180.0f,
+                         Vector2{0,0}, Color{110, 0, 200, 255});
+}
+
+void EffectSystem::addBlinkTrail(Vector2 origin) {
+    // Ghost echo fading at origin
+    effects.emplace_back(origin, EffectType::BLINK_TRAIL, 0.4f, 24.0f,
+                         Vector2{0,0}, Color{120, 0, 180, 255});
+}
+
+void EffectSystem::addBlinkImpact(Vector2 dest) {
+    // Explosive crit slash on arrival
+    effects.emplace_back(dest, EffectType::BLINK_IMPACT, 0.35f, 55.0f,
+                         Vector2{0,0}, Color{255, 255, 255, 255});
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  NEW: COMPANION VFX
+// ─────────────────────────────────────────────────────────────────────────────
+
+void EffectSystem::addCompanionSlash(Vector2 center, bool facingRight) {
+    // Purple sweeping arc from the Paladin's attack
+    float rotation = facingRight ? 0.0f : 180.0f;
+    effects.emplace_back(center, EffectType::COMPANION_SLASH, 0.25f, 38.0f,
+                         Vector2{0,0}, Color{160, 0, 255, 255}, rotation);
+}
+
+
 
 void EffectSystem::update(float deltaTime) {
     for (auto it = effects.begin(); it != effects.end();) {
@@ -715,6 +746,137 @@ void EffectSystem::draw() {
                 Vector2 tip = {e.position.x + cosf(ang) * (r * 1.5f), e.position.y + sinf(ang) * (r * 1.5f)};
                 DrawLineEx(e.position, tip, 3.0f, c);
             }
+            break;
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        //  SHADOW BURST RING — imploding gather then expanding dark ring
+        // ─────────────────────────────────────────────────────────────────
+        case EffectType::SHADOW_BURST_RING: {
+            Color c = e.tintColor;
+            if (progress < 0.25f) {
+                // Implosion gather phase — dark ring pulls inward
+                float t = progress / 0.25f;
+                float r = e.size * (1.0f - t * 0.8f);
+                c.a = (unsigned char)(180 * t);
+                DrawCircleLines((int)e.position.x, (int)e.position.y, r, c);
+                // Inner dark fill
+                DrawCircleV(e.position, r * 0.4f, Color{0, 0, 0, (unsigned char)(120 * t)});
+                // 8 tendrils rushing inward
+                for (int i = 0; i < 8; i++) {
+                    float ang = (i * 45.0f) * FX_PI / 180.0f;
+                    float tendLen = r * 0.5f;
+                    DrawLineEx(
+                        {e.position.x + cosf(ang) * (r + tendLen), e.position.y + sinf(ang) * (r + tendLen)},
+                        {e.position.x + cosf(ang) * r,             e.position.y + sinf(ang) * r},
+                        2.5f, Color{c.r, c.g, c.b, (unsigned char)(150 * t)});
+                }
+            } else {
+                // Burst expansion phase
+                float t = (progress - 0.25f) / 0.75f;
+                float outerR = easeOut(t) * e.size;
+                float innerR = outerR * 0.7f;
+                c.a = (unsigned char)(255 * (1.0f - t));
+                // Two expanding rings
+                DrawCircleLines((int)e.position.x, (int)e.position.y, outerR, c);
+                DrawCircleLines((int)e.position.x, (int)e.position.y, innerR,
+                                Color{c.r, c.g, c.b, (unsigned char)(c.a / 2)});
+                // Dark centre void
+                DrawCircleV(e.position, innerR * 0.3f, Color{0, 0, 0, (unsigned char)(180 * (1.0f - t))});
+                // 12 radial spokes
+                for (int i = 0; i < 12; i++) {
+                    float ang = (i * 30.0f + t * 30.0f) * FX_PI / 180.0f;
+                    DrawLineEx(
+                        {e.position.x + cosf(ang) * innerR, e.position.y + sinf(ang) * innerR},
+                        {e.position.x + cosf(ang) * outerR, e.position.y + sinf(ang) * outerR},
+                        2.0f, Color{c.r, c.g, c.b, (unsigned char)(c.a * 0.8f)});
+                }
+            }
+            break;
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        //  BLINK TRAIL — ghost silhouette fading at departure point
+        // ─────────────────────────────────────────────────────────────────
+        case EffectType::BLINK_TRAIL: {
+            Color c = e.tintColor;
+            c.a = (unsigned char)(200 * remaining);
+            // Silhouette box (approximate player size)
+            DrawRectangle((int)e.position.x, (int)e.position.y, 32, 48,
+                          Color{c.r, c.g, c.b, (unsigned char)(c.a / 2)});
+            DrawRectangleLines((int)e.position.x, (int)e.position.y, 32, 48, c);
+            // Scatter shadow shards upward
+            for (int i = 0; i < 5; i++) {
+                float ang = (90.0f + i * 18.0f - 36.0f) * FX_PI / 180.0f;
+                float len = easeOut(progress) * (12.0f + i * 5.0f);
+                DrawLineEx(
+                    {e.position.x + 16, e.position.y + 24},
+                    {e.position.x + 16 + cosf(ang) * len, e.position.y + 24 + sinf(ang) * len},
+                    2.0f, Color{c.r, c.g, c.b, (unsigned char)(c.a * 0.7f)});
+            }
+            break;
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        //  BLINK IMPACT — explosive crit slash on arrival
+        // ─────────────────────────────────────────────────────────────────
+        case EffectType::BLINK_IMPACT: {
+            // White shockwave flash
+            float r = easeOut(progress) * e.size;
+            unsigned char wa = (unsigned char)(255 * remaining);
+            DrawCircleV(e.position, r * 0.4f, Color{255, 255, 255, (unsigned char)(wa * 0.6f)});
+            DrawCircleLines((int)e.position.x, (int)e.position.y, r, Color{255, 255, 255, wa});
+
+            // 8 white impact lines
+            for (int i = 0; i < 8; i++) {
+                float ang = (i * 45.0f) * FX_PI / 180.0f;
+                float len = easeOut(progress) * e.size * 1.1f;
+                DrawLineEx(e.position,
+                           {e.position.x + cosf(ang) * len, e.position.y + sinf(ang) * len},
+                           3.5f, Color{255, 200, 255, wa});
+            }
+
+            // Purple crit arc sweeping 180°
+            float sweepTotal = FX_PI;
+            float arcP = easeOut(std::min(progress * 2.0f, 1.0f));
+            float currentSweep = sweepTotal * arcP;
+            int segs = 16;
+            for (int i = 0; i <= segs; i++) {
+                float ang = -FX_PI / 2.0f + currentSweep * (i / (float)segs);
+                float trail = (float)i / segs;
+                float ri = e.size * 0.4f, ro = e.size;
+                DrawLineEx(
+                    {e.position.x + cosf(ang) * ri, e.position.y + sinf(ang) * ri},
+                    {e.position.x + cosf(ang) * ro, e.position.y + sinf(ang) * ro},
+                    3.0f, Color{200, 80, 255, (unsigned char)(wa * trail)});
+            }
+            break;
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        //  COMPANION SLASH — purple arc when Paladin attacks
+        // ─────────────────────────────────────────────────────────────────
+        case EffectType::COMPANION_SLASH: {
+            float sweepTotal = 130.0f * FX_PI / 180.0f;
+            float arcP = easeOut(std::min(progress * 2.0f, 1.0f));
+            float startAngle = -sweepTotal / 2.0f;
+            float endAngle   = startAngle + sweepTotal * arcP;
+            float ri = e.size * 0.3f, ro = e.size;
+            Color c = e.tintColor;
+            int segs = 14;
+            for (int i = 0; i <= segs; i++) {
+                float ang = startAngle + (endAngle - startAngle) * (i / (float)segs);
+                float trail = (float)i / segs;
+                c.a = (unsigned char)(alpha * trail);
+                DrawLineEx(
+                    {e.position.x + cosf(ang) * ri, e.position.y + sinf(ang) * ri},
+                    {e.position.x + cosf(ang) * ro, e.position.y + sinf(ang) * ro},
+                    2.5f, c);
+            }
+            // Glow dot at arc tip
+            DrawCircleV(
+                {e.position.x + cosf(endAngle) * ro, e.position.y + sinf(endAngle) * ro},
+                4.0f, Color{200, 100, 255, alpha});
             break;
         }
 

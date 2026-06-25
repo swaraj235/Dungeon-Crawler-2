@@ -42,7 +42,7 @@ void ItemSystem::initialize() {
     itemDatabase.push_back({ItemType::ORBS, "Orb", "Rare currency", Color{255, 200, 0, 255}, 4, 99, 0, 0});
 
     // Pets/Evolution
-    itemDatabase.push_back({ItemType::SEEDS_OF_EVOLUTION, "Seed of Evolution", "Create fierce goblin companion", Color{0, 200, 100, 255}, 3, 1, 0, 0});
+    itemDatabase.push_back({ItemType::SEEDS_OF_EVOLUTION, "Seeds of Evolution", "Summons 3 Goblin Specimens", Color{0, 200, 100, 255}, 3, 1, 0, 0});
 
     // Quest Items
     itemDatabase.push_back({ItemType::ANCIENT_KEY, "Ancient Key", "Opens ancient doors", Color{218, 165, 32, 255}, 4, 1, 0, 0});

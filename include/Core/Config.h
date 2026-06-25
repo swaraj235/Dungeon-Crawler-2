@@ -36,7 +36,7 @@ namespace Config {
     constexpr int TILE_SIZE = 32;
     constexpr int MAP_WIDTH = 80;
     constexpr int MAP_HEIGHT = 50;
-    constexpr int LEVELS_PER_FLOOR = 5; // New map every 5 levels
+    constexpr int LEVELS_PER_FLOOR = 10; // 10 levels per floor
 
     // Potion Effects
     constexpr int HEALTH_POTION_HEAL = 75;

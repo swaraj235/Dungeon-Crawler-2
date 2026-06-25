@@ -17,7 +17,9 @@ enum class SpellType {
     FROST_NOVA,
     CHAIN_LIGHTNING,
     WHIRLWIND,
-    SHADOW_BALL
+    SHADOW_BALL,
+    SHADOW_BURST,
+    BLINK_STRIKE
 };
 
 struct Weapon {
@@ -103,6 +105,11 @@ public:
     // Spells
     void castSpell(SpellType type);
     bool canCast(SpellType type) const;
+    void unlockSpell(SpellType type, float cooldown, const std::string& name);
+
+    // Spell combo tracking
+    SpellType lastSpellCast = SpellType::NONE;
+    float lastSpellCastTimer = 0.0f;
     void gainExperience(int amount);
 
     // Movement

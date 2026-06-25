@@ -9,12 +9,14 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cfloat>
 
 Game::Game() : isRunning(true), isPaused(false), gameOver(false), gameTime(0),
                currentFloor(1), score(0), enemiesKilled(0),
                rng(std::random_device{}()), enemySpawnTimer(0), maxEnemies(3),
                cameraShakeTime(0), cameraShakeIntensity(0), attackFlashTimer(0),
-               inventoryOpen(false) {
+               inventoryOpen(false), shadowPaladinTamed(false), shadowPaladinSummonCooldown(0),
+               shadowPaladinActiveTime(0), canTamePaladin(false) {
 
     // ONLY initialize window, NOT the game!
     InitWindow(Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT, Config::GAME_TITLE);
@@ -148,6 +150,19 @@ void Game::update(float deltaTime) {
 
     if (attackFlashTimer > 0) attackFlashTimer -= deltaTime;
     if (cameraShakeTime > 0) cameraShakeTime -= deltaTime;
+    
+    if (shadowPaladinSummonCooldown > 0) shadowPaladinSummonCooldown -= deltaTime;
+    
+    if (loreTimer > 0) {
+        loreTimer -= deltaTime;
+    }
+    
+    // Check if Paladin died
+    bool isPaladinActiveNow = companionSystem.hasActiveCompanion(); // Assuming hasActiveCompanion checks for paladin specifically based on earlier code
+    if (wasPaladinActive && !isPaladinActiveNow) {
+        shadowPaladinSummonCooldown = 120.0f; // 2 minutes cooldown when he dies
+    }
+    wasPaladinActive = isPaladinActiveNow;
 
     // ONLY skip player/enemy updates when inventory is open
     if (inventoryOpen) {
@@ -155,7 +170,9 @@ void Game::update(float deltaTime) {
     }
 
     updatePlayer(deltaTime);
+    companionSystem.updateCompanion(deltaTime, player->getPosition(), enemies, gameMap.get(), &effectSystem);
     updateEnemies(deltaTime);
+    effectSystem.update(deltaTime);
     updateParticles(deltaTime);
     updateCamera();
     updateDamageNumbers(deltaTime);
@@ -193,8 +210,21 @@ void Game::handleInput() {
             const auto& inventory = player->getInventory();
             if (!inventory.empty() && hud->getSelectedInventoryItem() < (int)inventory.size()) {
                 const auto& selectedItem = inventory[hud->getSelectedInventoryItem()];
-                player->useItem(selectedItem.name);
-                effectSystem.addSpellCastReady(player->getPosition());
+                std::string itemName = selectedItem.name;
+                if (player->useItem(itemName)) {
+                    if (itemName == "Seeds of Evolution") {
+                        float angles[3] = {0.0f, 120.0f, 240.0f};
+                        for (int i=0; i<3; ++i) {
+                            float angRad = angles[i] * PI / 180.0f;
+                            Vector2 spawnPos = {
+                                player->getPosition().x + cosf(angRad) * 40.0f,
+                                player->getPosition().y + sinf(angRad) * 40.0f
+                            };
+                            companionSystem.tameCompanion(CompanionType::SEED_OF_EVOLUTION, player->getLevel(), spawnPos);
+                        }
+                    }
+                    effectSystem.addSpellCastReady(player->getPosition());
+                }
             }
         }
 
@@ -236,6 +266,51 @@ void Game::handleInput() {
         if (IsKeyPressed(KEY_K)) player->useItem("Stealth Potion");
         if (IsKeyPressed(KEY_L)) player->useItem("Rage Potion");
 
+        // Shadow Paladin Taming & Summoning
+        if (IsKeyPressed(KEY_T) && canTamePaladin && !shadowPaladinTamed) {
+            shadowPaladinTamed = true;
+            canTamePaladin = false;
+            
+            loreMessage = "The Throne lies empty, yet he stood guard...\nA fallen knight bound by an oath to a dead King.\nNow, his soul answers to you.";
+            loreTimer = 10.0f; // Display for 10 seconds
+
+            // Remove broken paladin
+            for (auto& enemy : enemies) {
+                if (enemy->getEnemyType() == EnemyType::FALLEN_SHADOW_PALADIN) {
+                    FallenShadowPaladin* paladin = dynamic_cast<FallenShadowPaladin*>(enemy.get());
+                    if (paladin && paladin->getBossInstance() && paladin->getBroken()) {
+                        enemy->takeDamage(99999); // force kill
+                        break;
+                    }
+                }
+            }
+            particleSystem.addMagic(player->getPosition(), Color{100, 255, 200, 255}, 30);
+            soundManager.playSound(SoundType::LEVEL_UP);
+            player->unlockSpell(SpellType::BLINK_STRIKE, 8.0f, "Blink Strike");
+        }
+
+        if (IsKeyPressed(KEY_F) && shadowPaladinTamed && shadowPaladinSummonCooldown <= 0) {
+            if (!companionSystem.hasActiveCompanion()) {
+                // Summon
+                companionSystem.tameCompanion(CompanionType::FALLEN_SHADOW_PALADIN, player->getLevel(), player->getPosition());
+                Companion* paladin = companionSystem.getCompanion();
+                if (paladin && paladinSavedHP != -1) {
+                    paladin->setHealth(paladinSavedHP);
+                }
+                wasPaladinActive = true;
+                particleSystem.addMagic(player->getPosition(), Color{200, 0, 200, 255}, 30);
+            } else {
+                // Unsummon
+                Companion* paladin = companionSystem.getCompanion();
+                if (paladin) {
+                    paladinSavedHP = paladin->getHealth();
+                    particleSystem.addMagic(paladin->getPosition(), Color{100, 0, 100, 255}, 30);
+                }
+                companionSystem.releaseCompanion(); // Actually, this might release all companions, but it's fine for now. We can also just iterate and remove the paladin if we want, but currently releaseCompanion just clears companions. Let's check `releaseCompanion()` later.
+                wasPaladinActive = false; // We unsummoned him, so don't trigger the death cooldown
+            }
+        }
+
         handleSpells();
     }
 }
@@ -244,11 +319,11 @@ void Game::handleSpells() {
     if (IsKeyPressed(KEY_ONE)) {
         castFireball();
     } else if (IsKeyPressed(KEY_TWO)) {
-        castChainLightning();
-    } else if (IsKeyPressed(KEY_THREE)) {
-        castFrostWave();
-    } else if (IsKeyPressed(KEY_FOUR)) {
         castWhirlwind();
+    } else if (IsKeyPressed(KEY_THREE)) {
+        castShadowBurst();
+    } else if (IsKeyPressed(KEY_FOUR)) {
+        castBlinkStrike();
     }
 }
 
@@ -271,7 +346,33 @@ void Game::updateEnemies(float deltaTime) {
     for (auto& enemy : enemies) {
         if (!enemy->getIsAlive()) continue;
 
-        enemy->setTarget(player.get());
+        Character* bestCharTarget = nullptr;
+        Companion* bestCompTarget = nullptr;
+        float minDistSq = FLT_MAX;
+        
+        if (player->getIsAlive() && !player->getIsStealthed()) {
+            Vector2 pPos = player->getPosition();
+            Vector2 ePos = enemy->getPosition();
+            minDistSq = (pPos.x - ePos.x)*(pPos.x - ePos.x) + (pPos.y - ePos.y)*(pPos.y - ePos.y);
+            bestCharTarget = player.get();
+        }
+        
+        auto& companions = companionSystem.getCompanions();
+        for (auto& comp : companions) {
+            if (comp->getIsAlive()) {
+                Vector2 cPos = comp->getPosition();
+                Vector2 ePos = enemy->getPosition();
+                float distSq = (cPos.x - ePos.x)*(cPos.x - ePos.x) + (cPos.y - ePos.y)*(cPos.y - ePos.y);
+                if (distSq < minDistSq) {
+                    minDistSq = distSq;
+                    bestCharTarget = nullptr;
+                    bestCompTarget = comp.get();
+                }
+            }
+        }
+        
+        enemy->setTarget(bestCharTarget);
+        enemy->setCompanionTarget(bestCompTarget);
 
         Vector2 oldPos = enemy->getPosition();
         enemy->update(deltaTime);
@@ -438,6 +539,15 @@ void Game::checkPlayerAttack() {
                     finalDamage, crit ? ORANGE : RED);
 
                 if (!enemy->getIsAlive()) {
+                    if (enemy->getEnemyType() == EnemyType::FALLEN_SHADOW_PALADIN) {
+                        FallenShadowPaladin* paladin = dynamic_cast<FallenShadowPaladin*>(enemy.get());
+                        if (paladin && paladin->getBossInstance() && !shadowPaladinTamed) {
+                            paladin->heal(paladin->getMaxHealth());
+                            paladin->setBroken(true);
+                            canTamePaladin = true;
+                            continue;
+                        }
+                    }
                     // ── Death burst (enemy's own colour) ──────────────────
                     effectSystem.addEnemyDeathBurst(ec, enemy->getDisplayColor());
                     particleSystem.addExplosion(enemy->getPosition(), ORANGE, 10);
@@ -456,20 +566,7 @@ void Game::checkPlayerAttack() {
                     damageNumbers.emplace_back(Vector2{enemy->getPosition().x + 15, enemy->getPosition().y - 15},
                                               expReward, YELLOW);
                     generateItemDrops(enemy.get());
-                    // TAMING SYSTEM - Chance to tame Shadow Paladin at level 35+
-                    if (enemy->getEnemyType() == EnemyType::FALLEN_SHADOW_PALADIN &&
-                        player->getLevel() >= 35 && !companionSystem.hasActiveCompanion()) {
 
-                        std::uniform_int_distribution<int> tamingChance(1, 100);
-                        if (tamingChance(rng) <= 30) { // 30% tame chance
-                            companionSystem.tameCompanion(CompanionType::FALLEN_SHADOW_PALADIN, player->getLevel());
-                            particleSystem.addMagic(enemy->getPosition(), Color{100, 255, 200, 255}, 20);
-
-                            // Show taming message
-                            DrawText("TAMED! Shadow Paladin joins you!",
-                                    GetScreenWidth() / 2 - 100, 100, 20, Color{0, 255, 136, 255});
-                        }
-                        }
                     // Item drops
                     std::uniform_int_distribution<int> dropChance(1, 100);
                     int chance = dropChance(rng);
@@ -583,7 +680,7 @@ void Game::spawnEnemies() {
     std::vector<Vector2> spawnPositions = gameMap->getSpawnPositions(toSpawn);
 
     for (int i = 0; i < toSpawn; i++) {
-        EnemyType type = selectEnemyType(player->getLevel());
+        EnemyType type = selectEnemyType(player->getLevel(), currentFloor);
         auto enemy = Enemy::create(type, player->getLevel());
 
         if (enemy) {
@@ -593,66 +690,37 @@ void Game::spawnEnemies() {
     }
 }
 
-EnemyType Game::selectEnemyType(int playerLevel) {
+EnemyType Game::selectEnemyType(int playerLevel, int currentFloor) {
     std::vector<EnemyType> availableTypes;
+    FloorTheme theme = gameMap->getTheme();
 
-    // Tier D (Always available)
-    if (playerLevel >= 1)
-    availableTypes.insert(availableTypes.end(), {
-        EnemyType::GOBLIN, EnemyType::SKELETON, EnemyType::SLIME,
-    });
-
-    if (playerLevel >= 5)
-        availableTypes.insert(availableTypes.end(), {
-            EnemyType::BAT, EnemyType::FIRE_SPIRIT, EnemyType::DARK_SPIRIT, EnemyType::LIGHT_SPIRIT
-        });
-
-    if (playerLevel >= 8)
-        availableTypes.insert(availableTypes.end(), {
-            EnemyType::HOUND, EnemyType::SALAMANDER_MAN
-        });
-
-    // Tier C (Level 10+)
-    if (playerLevel >= 10) {
-        availableTypes.insert(availableTypes.end(), {
-            EnemyType::CHIMERA_ANT, EnemyType::WEREWOLF, EnemyType::CERBERUS, EnemyType::HONEY_BEE
-        });
-    }
-
-    if (playerLevel >= 12) {
-        availableTypes.insert(availableTypes.end(), {
-            EnemyType::CYCLOPS, EnemyType::MINOTAUR, EnemyType::STONE_GOLEM, EnemyType::ANCIENT_MUMMY
-        });
-    }
-
-    if (playerLevel >= 15) {
-        std::uniform_int_distribution<int> bossChance(1, 100);
-        if (bossChance(rng) <= 5) { // 5% chance for Shadow Paladin
-            return EnemyType::FALLEN_SHADOW_PALADIN;
+    if (theme == FloorTheme::STONE_DUNGEON) {
+        availableTypes = { EnemyType::GOBLIN, EnemyType::SKELETON, EnemyType::SLIME, EnemyType::BAT };
+        if (playerLevel >= 5) {
+            availableTypes.insert(availableTypes.end(), { EnemyType::HOUND, EnemyType::FIRE_SPIRIT });
         }
-        availableTypes.insert(availableTypes.end(), {
-            EnemyType::IMP, EnemyType::ELF_GIRL, EnemyType::SKELETON_KNIGHT, EnemyType::WITCH
-        });
+        if (playerLevel >= 10) {
+            availableTypes.push_back(EnemyType::CHIMERA_ANT);
+        }
+    } 
+    else if (theme == FloorTheme::CATACOMBS) {
+        availableTypes = { EnemyType::SKELETON, EnemyType::SKELETON_HOUND, EnemyType::SKELETON_KNIGHT, EnemyType::ANCIENT_MUMMY };
+        if (playerLevel >= 12) {
+            availableTypes.insert(availableTypes.end(), { EnemyType::DARK_SPIRIT, EnemyType::IMP });
+        }
+        if (playerLevel >= 15) {
+            availableTypes.push_back(EnemyType::MINOTAUR);
+        }
     }
-
-    if (playerLevel >= 18) {
-        availableTypes.insert(availableTypes.end(), {
-            EnemyType::MAGE, EnemyType::GOBLIN_GIANT, EnemyType::LAVA_GOLEM
-        });
-    }
-
-    if (playerLevel >= 20) {
-        std::uniform_int_distribution<int> bossChance(1, 100);
-        if (bossChance(rng) <= 5) { // 5% chance for Shadow Paladin
-            return EnemyType::HARPY_QUEEN;
+    else if (theme == FloorTheme::SHADOW_PALACE) {
+        availableTypes = { EnemyType::DARK_SPIRIT, EnemyType::IMP };
+        if (playerLevel >= 18) {
+            availableTypes.insert(availableTypes.end(), { EnemyType::GOBLIN_GIANT, EnemyType::WITCH });
         }
     }
 
-    if (playerLevel >= 25) {
-        std::uniform_int_distribution<int> bossChance(1, 100);
-        if (bossChance(rng) <= 5) {
-            return EnemyType::NECROMANCER;
-        }
+    if (availableTypes.empty()) {
+        availableTypes.push_back(EnemyType::GOBLIN); // Fallback
     }
 
     std::uniform_int_distribution<size_t> dist(0, availableTypes.size() - 1);
@@ -829,6 +897,76 @@ void Game::castWhirlwind() {
     cameraShakeIntensity = 8.0f;
 }
 
+void Game::castShadowBurst() {
+    if (!player->canCast(SpellType::SHADOW_BURST)) return;
+
+    Vector2 playerPos = player->getPosition();
+    Vector2 playerCenter = {playerPos.x + 16, playerPos.y + 16};
+    float radius = 180.0f;
+    int damage = player->computeAttackDamage() + 25; // Good AoE burst
+
+    // Visual effect
+    effectSystem.addShadowBurstRing(playerCenter);
+
+    for (auto& enemy : enemies) {
+        if (!enemy->getIsAlive()) continue;
+
+        Vector2 enemyCenter = {enemy->getPosition().x + 16, enemy->getPosition().y + 16};
+        float dx = enemyCenter.x - playerCenter.x;
+        float dy = enemyCenter.y - playerCenter.y;
+
+        if (dx * dx + dy * dy <= radius * radius) {
+            enemy->takeDamage(damage);
+            effectSystem.addEnemyAttackShadow(enemyCenter); // Visual tint/hit
+        }
+    }
+    
+    player->castSpell(SpellType::SHADOW_BURST);
+}
+
+void Game::castBlinkStrike() {
+    if (!player->canCast(SpellType::BLINK_STRIKE)) return;
+
+    // Find nearest enemy in blink range
+    Enemy* nearestEnemy = nullptr;
+    float minDistSq = 350.0f * 350.0f; // Blink range
+    Vector2 playerCenter = {player->getPosition().x + 16, player->getPosition().y + 16};
+
+    for (auto& enemy : enemies) {
+        if (!enemy->getIsAlive()) continue;
+
+        Vector2 enemyCenter = {enemy->getPosition().x + 16, enemy->getPosition().y + 16};
+        float dx = enemyCenter.x - playerCenter.x;
+        float dy = enemyCenter.y - playerCenter.y;
+        float distSq = dx * dx + dy * dy;
+
+        if (distSq < minDistSq) {
+            minDistSq = distSq;
+            nearestEnemy = enemy.get();
+        }
+    }
+
+    if (nearestEnemy) {
+        Vector2 destPos = nearestEnemy->getPosition();
+        // Leave trail at old pos
+        effectSystem.addBlinkTrail(player->getPosition());
+
+        // Teleport
+        player->setPosition(destPos);
+
+        // Huge damage (3x crit)
+        int damage = player->computeAttackDamage() * 3;
+        nearestEnemy->takeDamage(damage);
+
+        // Arrive impact
+        effectSystem.addBlinkImpact({destPos.x + 16, destPos.y + 16});
+        particleSystem.addExplosion(destPos, Color{255, 255, 255, 255}, 15);
+        soundManager.playSound(SoundType::ENEMY_HIT);
+
+        player->castSpell(SpellType::BLINK_STRIKE);
+    }
+}
+
 void Game::generateNewFloor() {
     currentFloor++;
     gameMap->generateFloor(currentFloor);
@@ -839,6 +977,16 @@ void Game::generateNewFloor() {
     player->setPosition(newPos);
 
     spawnEnemies();
+
+    if (gameMap->getTheme() == FloorTheme::SHADOW_PALACE && gameMap->getThroneRoomCenter().x != 0) {
+        auto boss = Enemy::create(EnemyType::FALLEN_SHADOW_PALADIN, player->getLevel());
+        if (boss) {
+            boss->setPosition(gameMap->getThroneRoomCenter());
+            FallenShadowPaladin* paladin = dynamic_cast<FallenShadowPaladin*>(boss.get());
+            if (paladin) paladin->setBossInstance(true);
+            enemies.push_back(std::move(boss));
+        }
+    }
 
     std::cout << "Entered Floor " << currentFloor << std::endl;
 }
@@ -957,6 +1105,24 @@ void Game::draw() {
 
     // Draw HUD
     hud->draw(this, player.get());
+
+    if (canTamePaladin && !shadowPaladinTamed) {
+        DrawText("Press [T] to Tame the Shadow Paladin!", GetScreenWidth() / 2 - 200, 150, 20, GREEN);
+    }
+    
+    if (shadowPaladinTamed && shadowPaladinSummonCooldown <= 0 && !companionSystem.hasActiveCompanion()) {
+        DrawText("Press [F] to Summon Shadow Paladin", 20, 200, 20, PURPLE);
+    } else if (shadowPaladinSummonCooldown > 0) {
+        DrawText(TextFormat("Paladin Cooldown: %0.1fs", shadowPaladinSummonCooldown), 20, 200, 20, GRAY);
+    }
+
+    if (loreTimer > 0 && !loreMessage.empty()) {
+        int textWidth = MeasureText(loreMessage.c_str(), 20);
+        // We can draw it near the bottom center
+        DrawRectangle(GetScreenWidth()/2 - 300, GetScreenHeight() - 150, 600, 100, Fade(BLACK, 0.7f));
+        DrawRectangleLines(GetScreenWidth()/2 - 300, GetScreenHeight() - 150, 600, 100, PURPLE);
+        DrawText(loreMessage.c_str(), GetScreenWidth()/2 - textWidth/2 + 100, GetScreenHeight() - 130, 20, LIGHTGRAY);
+    }
 
     if (gameOver) {
         drawGameOver();
@@ -1106,6 +1272,7 @@ void Game::cleanup() {
     player.reset();
     gameMap.reset();
     hud.reset();
+    companionSystem.releaseAllCompanions(); // Clear textures BEFORE CloseWindow
 
     CloseWindow();
     std::cout << "Game cleanup completed" << std::endl;

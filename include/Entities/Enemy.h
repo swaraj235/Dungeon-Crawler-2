@@ -3,6 +3,8 @@
 #include <string>
 #include <memory>
 
+class Companion;
+
 enum class EnemyType {
     // Tier D
     GOBLIN, SKELETON, SLIME, HOUND, BAT, FIRE_SPIRIT, DARK_SPIRIT, LIGHT_SPIRIT,
@@ -33,6 +35,7 @@ protected:
     float attackRange;
 
     Character* target;
+    Companion* companionTarget;
     AIState currentState;
 
     // Direction (for sprite flip)
@@ -78,6 +81,7 @@ public:
     bool getFacingRight() const { return facingRight; }
     EnemyType getType() const { return enemyType; }
     void setTarget(Character* t) { target = t; }
+    void setCompanionTarget(Companion* c) { companionTarget = c; }
     Color getDisplayColor() const { return displayColor; }
 
     // Windup animation state — read by Game.cpp to fire EffectSystem events
@@ -277,11 +281,18 @@ private:
     float dashCooldown;
     float lastDashTime;
     bool isDashing;
+    bool isBossInstance;
+    bool isBroken;
 
 public:
     FallenShadowPaladin(int playerLevel);
     void updateAI(float deltaTime) override;
     void performAttack() override;
+    
+    void setBossInstance(bool val) { isBossInstance = val; }
+    bool getBossInstance() const { return isBossInstance; }
+    void setBroken(bool val) { isBroken = val; }
+    bool getBroken() const { return isBroken; }
 };
 
 class HarpyQueen : public Enemy {

@@ -67,6 +67,21 @@ private:
     // Save system
     SaveData saveData;
 
+    // Shadow Paladin Taming
+    bool isBossInstance = false;
+    bool canTamePaladin = false;
+    bool shadowPaladinTamed = false;
+    float shadowPaladinSummonCooldown = 0.0f;
+    float shadowPaladinActiveTime = 0.0f;
+    bool wasPaladinActive = false;
+
+    // Lore mechanics
+    std::string loreMessage = "";
+    float loreTimer = 0.0f;
+
+    // HP saving for toggle
+    int paladinSavedHP = -1;
+
 public:
     Game();
     ~Game();
@@ -97,6 +112,8 @@ private:
     void castFrostWave();
     void castChainLightning();
     void castWhirlwind();
+    void castShadowBurst();
+    void castBlinkStrike();
 
     void drawDamageNumbers();
     void generateItemDrops(Enemy* enemy);
@@ -108,7 +125,7 @@ private:
     void loadGame();
 
     // Utility
-    EnemyType selectEnemyType(int playerLevel);
+    EnemyType selectEnemyType(int playerLevel, int currentFloor);
     int calculateMaxEnemies() const;
     bool shouldSpawnEnemy() const;
 

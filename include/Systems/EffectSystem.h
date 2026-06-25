@@ -37,6 +37,14 @@ enum class EffectType {
     ENEMY_ATK_BITE,      // Fang-snap V (Bat, Cerberus, ChimeraAnt)
     ENEMY_ATK_SHADOW,    // Dark implosion (Imp, Dark Spirit, Shadow Paladin)
     ENEMY_ATK_FIRE,      // Fire burst (Fire Spirit, Lava Golem, Fire Hound)
+
+    // NEW: Player spells
+    SHADOW_BURST_RING,   // Expanding dark ring from Shadow Burst
+    BLINK_TRAIL,         // Ghost image left at blink origin
+    BLINK_IMPACT,        // Explosive arrival slash at blink destination
+
+    // NEW: Companion VFX
+    COMPANION_SLASH,     // Purple slash arc when Paladin attacks
 };
 
 struct Effect {
@@ -96,6 +104,14 @@ public:
     void addEnemyAttackBite(Vector2 center, bool facingRight);
     void addEnemyAttackShadow(Vector2 center);
     void addEnemyAttackFire(Vector2 center);
+
+    // ── NEW: Player Spell VFX ────────────────────────────────────────────────
+    void addShadowBurstRing(Vector2 center);   // Shadow Burst expanding ring
+    void addBlinkTrail(Vector2 origin);        // Ghost echo at departure point
+    void addBlinkImpact(Vector2 dest);         // Explosive slash at arrival
+
+    // ── NEW: Companion VFX ───────────────────────────────────────────────────
+    void addCompanionSlash(Vector2 center, bool facingRight);    // Paladin purple attack arc
 
     // ── Core ─────────────────────────────────────────────────────────────
     void update(float deltaTime);

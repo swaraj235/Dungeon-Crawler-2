@@ -6,6 +6,7 @@
 #include <cmath>
 #include <memory>
 #include "raymath.h"
+#include "Systems/CompanionSystem.h"
 
 // Hit flash state tracking
 namespace {
@@ -19,7 +20,7 @@ Enemy::Enemy(EnemyType type, int hp, int lvl, const std::string& spritePath,
              const std::string& name, float spd, int atk, float aggro, float atkRange)
     : Character(hp, lvl, spritePath, name), enemyType(type), tier(EnemyTier::D),
       speed(spd), attackDamage(atk), attackCooldown(2.5f), lastAttackTime(0),
-      aggroRange(aggro), attackRange(atkRange), target(nullptr),
+      aggroRange(aggro), attackRange(atkRange), target(nullptr), companionTarget(nullptr),
       currentState(AIState::IDLE), facingRight(true),
       wanderTimer(0.0f), wanderTarget({0, 0}),
       windupTimer(0.0f), windupFired(false), justAttacked(false), hitFlashTime(0) {
@@ -124,7 +125,7 @@ void Enemy::draw() {
 }
 
 void Enemy::updateAI(float deltaTime) {
-    if (!target || !target->getIsAlive()) {
+    if ((!target || !target->getIsAlive()) && (!companionTarget || !companionTarget->getIsAlive())) {
         // Wander randomly when no target
         wanderTimer -= deltaTime;
         if (wanderTimer <= 0.0f) {
@@ -146,14 +147,30 @@ void Enemy::updateAI(float deltaTime) {
         return;
     }
 
-    if (Player* p = dynamic_cast<Player*>(target)) {
-        if (p->getIsStealthed()) {
-            currentState = AIState::IDLE;
-            return; // Ignore player completely while stealthed
+    Vector2 currTargetPos = position;
+    bool hasValidTarget = false;
+
+    if (target && target->getIsAlive()) {
+        if (Player* p = dynamic_cast<Player*>(target)) {
+            if (!p->getIsStealthed()) {
+                currTargetPos = target->getPosition();
+                hasValidTarget = true;
+            }
+        } else {
+            currTargetPos = target->getPosition();
+            hasValidTarget = true;
         }
+    } else if (companionTarget && companionTarget->getIsAlive()) {
+        currTargetPos = companionTarget->getPosition();
+        hasValidTarget = true;
     }
 
-    float distanceToTarget = Vector2Distance(position, target->getPosition());
+    if (!hasValidTarget) {
+        currentState = AIState::IDLE;
+        return;
+    }
+
+    float distanceToTarget = Vector2Distance(position, currTargetPos);
 
     // Tick windup timer
     if (windupTimer > 0.0f) {
@@ -222,9 +239,16 @@ void Enemy::updateAI(float deltaTime) {
 }
 
 void Enemy::moveTowardsTarget(float deltaTime) {
-    if (!target) return;
+    Vector2 targetPos = position;
+    if (target && target->getIsAlive()) {
+        if (Player* p = dynamic_cast<Player*>(target)) {
+            if (!p->getIsStealthed()) targetPos = target->getPosition();
+        } else targetPos = target->getPosition();
+    } else if (companionTarget && companionTarget->getIsAlive()) {
+        targetPos = companionTarget->getPosition();
+    } else return;
 
-    Vector2 direction = {target->getPosition().x - position.x, target->getPosition().y - position.y};
+    Vector2 direction = {targetPos.x - position.x, targetPos.y - position.y};
     float distance = Vector2Length(direction);
 
     if (distance > 0) {
@@ -760,7 +784,7 @@ FallenShadowPaladin::FallenShadowPaladin(int playerLevel)
     : Enemy(EnemyType::FALLEN_SHADOW_PALADIN, 180 + playerLevel * 10, playerLevel,  // STRONGER
             "assets/sprite/fallen_shadow_paladin.png", "Fallen Shadow Paladin",
             100.0f, 35 + playerLevel * 3, 150.0f, 60.0f),
-      dashCooldown(5.0f), lastDashTime(0), isDashing(false) {
+      dashCooldown(5.0f), lastDashTime(0), isDashing(false), isBossInstance(false), isBroken(false) {
     tier = EnemyTier::A;  // CHANGE to Tier A
     attackCooldown = 3.5f;
     displayColor = Color{100, 50, 150, 255};

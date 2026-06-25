@@ -33,6 +33,10 @@ void Player::update(float deltaTime) {
         spell.lastCastTime += deltaTime;
     }
 
+    // Update spell combo window timer
+    if (lastSpellCastTimer > 0) lastSpellCastTimer -= deltaTime;
+    if (lastSpellCastTimer <= 0) lastSpellCast = SpellType::NONE;
+
     // Update buffs
     if (speedBuffTime > 0) speedBuffTime -= deltaTime;
     if (stealthBuffTime > 0) stealthBuffTime -= deltaTime;
@@ -136,6 +140,8 @@ void Player::castSpell(SpellType type) {
     for (auto& spell : spells) {
         if (spell.type == type && spell.lastCastTime >= spell.cooldown) {
             spell.lastCastTime = 0;
+            lastSpellCast = type;
+            lastSpellCastTimer = 2.5f; // combo window
             break;
         }
     }
@@ -148,6 +154,15 @@ bool Player::canCast(SpellType type) const {
         }
     }
     return false;
+}
+
+void Player::unlockSpell(SpellType type, float cooldown, const std::string& name) {
+    // Don't add duplicate
+    for (const auto& spell : spells) {
+        if (spell.type == type) return;
+    }
+    spells.push_back({type, cooldown, cooldown, 0, name});
+    std::cout << "Spell Unlocked: " << name << "!" << std::endl;
 }
 
 int Player::getExpNeeded() const {
@@ -168,23 +183,20 @@ void Player::gainExperience(int amount) {
         attackDamage += Config::DAMAGE_PER_LEVEL;
         speed += Config::SPEED_PER_LEVEL;
 
-        // Unlock items at certain levels
-        if (level == 5) {
+        // Unlock spells at certain levels
+        if (level == 8) {
             spells.push_back({SpellType::FIREBALL, 2.0f, 2.0f, 0, "Firebolt"});
-            std::cout << "Spell Unlocked: Firebolt!" << std::endl;
-        }
-        else if (level == 10) {
-            spells.push_back({SpellType::CHAIN_LIGHTNING, 6.0f, 6.0f, 0, "Chain Lightning"});
-            addItem("Scorching Gauntlet", 1);
-            addItem("Seeds of Evolution", 5);
-            std::cout << "Weapon Unlocked: Scorching Gauntlet!" << std::endl;
+            std::cout << "Spell Unlocked: Firebolt! [Key 1]" << std::endl;
         }
         else if (level == 15) {
-            spells.push_back({SpellType::FROST_NOVA, 8.0f, 8.0f, 0, "Frost Nova"});
+            spells.push_back({SpellType::WHIRLWIND, 10.0f, 10.0f, 0, "Whirlwind"});
+            std::cout << "Spell Unlocked: Whirlwind! [Key 2]" << std::endl;
         }
         else if (level == 20) {
-            spells.push_back({SpellType::WHIRLWIND, 10.0f, 10.0f, 0, "Whirlwind"});
+            spells.push_back({SpellType::SHADOW_BURST, 10.0f, 10.0f, 0, "Shadow Burst"});
+            std::cout << "Spell Unlocked: Shadow Burst! [Key 3]" << std::endl;
         }
+        // Chain Lightning (future Floor 4), Frost Nova (future Floor 4) — reserved
 
         std::cout << "Level Up! Now level " << level << std::endl;
     }
@@ -219,7 +231,7 @@ bool Player::useItem(const std::string& itemName) {
             } else if (itemName == "Holy Water of Life") {
                 heal(Config::HOLY_WATER_OF_LIFE_HEAL);
             } else if (itemName == "Seeds of Evolution") {
-                gainExperience(50);
+                // Summoning handled in Game.cpp
             } else if (itemName == "Scorching Gauntlet") {
                 currentWeapon = {WeaponType::IRON_KATANA, 25, 1.2f, 0.15f, "Scorching Gauntlet"};
             }
